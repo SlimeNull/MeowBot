@@ -205,6 +205,11 @@ internal class Program
             }
         });
 
+        session.UseGroupRequest(async context =>
+        {
+            await session.ApproveGroupRequestAsync(context.Flag, context.GroupRequestType);
+        });
+
         while (true)
         {
             try

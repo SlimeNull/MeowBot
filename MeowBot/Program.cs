@@ -60,32 +60,134 @@ internal class Program
         Dictionary<long, IOpenAiComplection> aiSessions = new Dictionary<long, IOpenAiComplection>();
         session.UseGroupMessage(async context =>
         {
+            int maxHistoryCount = 50;
+
             try
             {
                 if (context.Message.Any(msg => msg is CqAtMsg atMsg && atMsg.QQ == context.SelfId))
                 {
+                    string msgTxt = context.Message.Text.Trim();
+
                     if (!aiSessions.TryGetValue(context.UserId, out IOpenAiComplection? aiSession))
-                        aiSessions[context.UserId] = aiSession = new OpenAiChatCompletionSession(appConfig.ApiKey);
-
-                    if (aiSession is OpenAiChatCompletionSession chatCompletionSession)
-                        chatCompletionSession.InitCatGirl();
-
-                    string? result = await aiSession.AskAsync(context.Message.Text);
-                    if (result != null)
                     {
+                        aiSessions[context.UserId] = aiSession = new OpenAiChatCompletionSession(appConfig.ApiKey, appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl);
+
+                        if (aiSession is OpenAiChatCompletionSession chatCompletionSession)
+                            chatCompletionSession.InitCatGirl();
+                    }
+
+                    if (msgTxt.StartsWith("#help", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string helpText =
+                            """
+                            (机器人指令)
+
+                            #role:角色           切换角色, 目前支持 CatGirl(猫娘), NewBing(嘴臭必应)
+                            #custom-role:内容    自定义角色
+                            #reset               重置聊天记录
+
+                            注意, 普通用户最多保留 50 条聊天记录, 多的会被删除, 也就是说, 机器人会逐渐忘记你
+                            """;
+
                         await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
                         {
                             new CqAtMsg(context.UserId),
-                            new CqTextMsg(result)
+                            new CqTextMsg(helpText)
                         });
+                    }
+                    else if (msgTxt.StartsWith("#reset", StringComparison.OrdinalIgnoreCase))
+                    {
+                        aiSession.Reset();
+                        await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                        {
+                            new CqAtMsg(context.UserId),
+                            new CqTextMsg("> 会话已重置")
+                        });
+
+                        return;
+                    }
+                    else if (msgTxt.StartsWith("#role:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string role = msgTxt.Substring(6).Trim();
+
+                        string? initText = OpenAiCompletionInitTexts.GetFromName(role);
+                        if (initText != null)
+                        {
+                            aiSession.InitWithText(initText);
+                            await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                            {
+                                new CqAtMsg(context.UserId),
+                                new CqTextMsg($"> 角色已更新:\n{initText}")
+                            });
+                        }
+                        else
+                        {
+                            await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                            {
+                                new CqAtMsg(context.UserId),
+                                new CqTextMsg($"> 找不到执行的角色")
+                            });
+                        }
+                    }
+                    else if (msgTxt.StartsWith("#custom-role:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string initText = msgTxt.Substring(13);
+                        aiSession.InitWithText(initText);
+                        await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                            {
+                                new CqAtMsg(context.UserId),
+                                new CqTextMsg($"> 角色已更新:\n{initText}")
+                            });
+                    }
+                    else if (msgTxt.StartsWith("#history", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CqMessage message = new CqMessage()
+                        {
+                            new CqAtMsg(context.UserId),
+                            new CqTextMsg($"> 历史记录: {aiSession.History.Count}条")
+                        };
+
+                        bool inWhiteList = false;
+                        if (appConfig.WhiteList != null && appConfig.WhiteList.Contains(context.UserId))
+                            inWhiteList = true;
+
+                        if (!inWhiteList)
+                            message.Add(new CqTextMsg($"(您的聊天会话最多保留 {maxHistoryCount} 条消息)"));
+
+                        await session.SendGroupMessageAsync(context.GroupId, message);
                     }
                     else
                     {
-                        await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                        bool dequeue = false;
+                        if (aiSession.History.Count > maxHistoryCount && (appConfig.WhiteList == null || !appConfig.WhiteList.Contains(context.UserId)))
+                            dequeue = true;
+
+                        if (dequeue)
+                            while (aiSession.History.Count > maxHistoryCount)
+                                aiSession.History.Dequeue();
+
+                        string? result = await aiSession.AskAsync(context.Message.Text);
+                        if (result != null)
                         {
-                            new CqAtMsg(context.UserId),
-                            new CqTextMsg("(请求失败, 请重新尝试)")
-                        });
+                            CqMessage message = new CqMessage()
+                            {
+                                new CqAtMsg(context.UserId),
+                                new CqTextMsg(result),
+                            };
+
+                            if (dequeue)
+                                message.WithTail($"(消息历史记录超过 {maxHistoryCount} 条, 已删去多余的历史记录)");
+
+                            await session.SendGroupMessageAsync(context.GroupId, message);
+                        }
+                        else
+                        {
+                            await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                            {
+                                new CqAtMsg(context.UserId),
+                                new CqTextMsg("(请求失败, 请重新尝试)")
+                            });
+                        }
                     }
                 }
             }
@@ -95,12 +197,20 @@ internal class Program
             }
         });
 
+        session.UseGroupMessage(async context =>
+        {
+            if (context.Message.Text.StartsWith("echo ", StringComparison.OrdinalIgnoreCase))
+            {
+                await session.SendGroupMessageAsync(context.GroupId, new CqMessage(context.Message.Text.Substring(5)));
+            }
+        });
+
         while (true)
         {
             try
             {
                 await session.StartAsync();
-                await Console.Out.WriteLineAsync("连接完毕啦");
+                await Console.Out.WriteLineAsync("连接完毕啦 ヾ(≧▽≦*)o");
                 await session.WaitForShutdownAsync();
             }
             catch (Exception ex)

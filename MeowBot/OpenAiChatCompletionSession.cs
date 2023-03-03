@@ -1,27 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http.Json;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Net.Http.Json;
 
 namespace MeowBot
 {
-    internal class OpenAiTextCompletionSession : IOpenAiComplection
+    internal class OpenAiChatCompletionSession : IOpenAiComplection
     {
         private string initText =
             """
             我是一个高度智能的问答机器人。如果你问我一个植根于真理的问题，我会给你答案。如果你问我一个无稽之谈、诡计多端或没有明确答案的问题，我会回答“未知”。
             """;
 
-        private Queue<KeyValuePair<string, string>> history = 
+        private string? davinciRole;
+        private Queue<KeyValuePair<string, string>> history =
             new Queue<KeyValuePair<string, string>>();
 
         public string ApiKey { get; }
         public string ApiUrl { get; }
         public Queue<KeyValuePair<string, string>> History => history;
 
-        public OpenAiTextCompletionSession(string apiKey, string apiUrl)
+        public OpenAiChatCompletionSession(string apiKey, string apiUrl)
         {
             ApiKey = apiKey;
             ApiUrl = apiUrl;
@@ -44,22 +40,34 @@ namespace MeowBot
 
         public async Task<string?> AskAsync(string question)
         {
-            StringBuilder historyTextBuilder = new StringBuilder();
+            List<object> messageModels = new List<object>();
+
+            messageModels.Add(new
+            {
+                role = "system",
+                content = initText
+            });
+
             foreach (var kv in history)
             {
-                historyTextBuilder.AppendLine($"Q: {kv.Key}");
-                historyTextBuilder.AppendLine($"A: {kv.Value}");
-                historyTextBuilder.AppendLine();
+                messageModels.Add(new
+                {
+                    role = "user",
+                    content = kv.Key,
+                });
+
+                messageModels.Add(new
+                {
+                    role = davinciRole ?? "you",
+                    content = kv.Value
+                });
             }
 
-            string prompt = $"""
-                {initText}
-
-                {historyTextBuilder.ToString()}
-
-                Q: {question}
-                A: 
-                """;
+            messageModels.Add(new
+            {
+                role = "user",
+                content = question
+            });
 
 
             var request =
@@ -73,28 +81,29 @@ namespace MeowBot
                     Content = JsonContent.Create(
                         new
                         {
-                            model = "text-davinci-003",
-                            prompt = prompt,
+                            model = "gpt-3.5-turbo-0301",
+                            messages = messageModels,
                             max_tokens = 2048,
                             temperature = 0.5,
                         }),
                 };
 
-
             var response = await Utils.GlobalHttpClient.SendAsync(request);
             var davinci_rst = await response.Content.ReadFromJsonAsync<davinci_result>();
-
             if (davinci_rst == null)
                 return null;
 
-            var davinci_rst_txt =
-                davinci_rst.choices.Select(choice => choice.text).FirstOrDefault();
+            var davinci_rst_message =
+                davinci_rst.choices.Select(choice => choice.message).FirstOrDefault();
 
-            if (davinci_rst_txt == null)
+            if (davinci_rst_message == null)
                 return null;
 
-            history.Enqueue(new KeyValuePair<string, string>(question, davinci_rst_txt));
-            return davinci_rst_txt;
+            davinciRole = davinci_rst_message.role;
+
+            history.Enqueue(new KeyValuePair<string, string>(question, davinci_rst_message.content));
+
+            return davinci_rst_message.content;
         }
 
         public void Reset() => history.Clear();
@@ -103,9 +112,13 @@ namespace MeowBot
         {
             public class davinci_result_choice
             {
-                public string text { get; set; }
+                public class davinci_result_choice_message
+                {
+                    public string role { get; set; }
+                    public string content { get; set; }
+                }
                 public int index { get; set; }
-                public object logprobs { get; set; }
+                public davinci_result_choice_message message { get; set; }
                 public string finish_reason { get; set; }
             }
             public class davinci_result_usage
@@ -117,9 +130,9 @@ namespace MeowBot
             public string id { get; set; }
             public string @object { get; set; }
             public int created { get; set; }
-            public string model { get; set; }
             public davinci_result_choice[] choices { get; set; }
             public davinci_result_usage usage { get; set; }
         }
+
     }
 }

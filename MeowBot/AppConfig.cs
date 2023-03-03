@@ -12,5 +12,12 @@ namespace MeowBot
 
         public string? ApiKey { get; set; }
         public string? BotWebSocketUri { get; set; }
+
+        public string? ChatCompletionApiUrl { get; set; }
+        public string? TextCompletionApiUrl { get; set; }
+
+        public static string DefaultChatCompletionApiUrl { get; } = "https://api.openai.com/v1/chat/completions";
+
+        public long[]? WhiteList { get; set; }
     }
 }

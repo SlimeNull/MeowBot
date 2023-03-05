@@ -106,7 +106,8 @@ internal class Program
 
                         return;
                     }
-                    else if (msgTxt.StartsWith("#role:", StringComparison.OrdinalIgnoreCase))
+                    else if (msgTxt.StartsWith("#role:", StringComparison.OrdinalIgnoreCase) ||
+                             msgTxt.StartsWith("#role ", StringComparison.OrdinalIgnoreCase))
                     {
                         string role = msgTxt.Substring(6).Trim();
 
@@ -129,7 +130,8 @@ internal class Program
                             });
                         }
                     }
-                    else if (msgTxt.StartsWith("#custom-role:", StringComparison.OrdinalIgnoreCase))
+                    else if (msgTxt.StartsWith("#custom-role:", StringComparison.OrdinalIgnoreCase) ||
+                             msgTxt.StartsWith("#custom-role ", StringComparison.OrdinalIgnoreCase))
                     {
                         string initText = msgTxt.Substring(13);
                         aiSession.InitWithText(initText);
@@ -138,6 +140,7 @@ internal class Program
                                 new CqAtMsg(context.UserId),
                                 new CqTextMsg($"> 角色已更新:\n{initText}")
                             });
+                        aiSession.Reset();
                     }
                     else if (msgTxt.StartsWith("#history", StringComparison.OrdinalIgnoreCase))
                     {
@@ -166,27 +169,38 @@ internal class Program
                             while (aiSession.History.Count > maxHistoryCount)
                                 aiSession.History.Dequeue();
 
-                        string? result = await aiSession.AskAsync(context.Message.Text);
-                        if (result != null)
+                        try
                         {
-                            CqMessage message = new CqMessage()
+                            string? result = await aiSession.AskAsync(context.Message.Text);
+                            if (result != null)
                             {
-                                new CqAtMsg(context.UserId),
-                                new CqTextMsg(result),
-                            };
+                                CqMessage message = new CqMessage()
+                                {
+                                    new CqAtMsg(context.UserId),
+                                    new CqTextMsg(result),
+                                };
 
-                            if (dequeue)
-                                message.WithTail($"(消息历史记录超过 {maxHistoryCount} 条, 已删去多余的历史记录)");
+                                if (dequeue)
+                                    message.WithTail($"(消息历史记录超过 {maxHistoryCount} 条, 已删去多余的历史记录)");
 
-                            await session.SendGroupMessageAsync(context.GroupId, message);
+                                await session.SendGroupMessageAsync(context.GroupId, message);
+                            }
+                            else
+                            {
+                                await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                                {
+                                    new CqAtMsg(context.UserId),
+                                    new CqTextMsg("(请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人)")
+                                });
+                            }
                         }
-                        else
+                        catch
                         {
                             await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
-                            {
-                                new CqAtMsg(context.UserId),
-                                new CqTextMsg("(请求失败, 请重新尝试)")
-                            });
+                                {
+                                    new CqAtMsg(context.UserId),
+                                    new CqTextMsg("(请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人)")
+                                });
                         }
                     }
                 }

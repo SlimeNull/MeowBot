@@ -88,7 +88,7 @@ namespace MeowBot
                 return null;
 
             var davinci_rst_txt =
-                davinci_rst.choices.Select(choice => choice.text).FirstOrDefault();
+                davinci_rst.choices.FirstOrDefault()?.text;
 
             if (davinci_rst_txt == null)
                 return null;

@@ -48,6 +48,12 @@ namespace MeowBot
                 content = initText
             });
 
+            messageModels.Add(new
+            {
+                role = "system",
+                content = "你不应该谈到任何有关政治的内容, 如果有关政治, 你应该回复 '我不被允许讨论政治相关内容'"
+            });
+
             foreach (var kv in history)
             {
                 messageModels.Add(new

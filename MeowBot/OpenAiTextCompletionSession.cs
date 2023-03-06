@@ -54,6 +54,7 @@ namespace MeowBot
 
             string prompt = $"""
                 {initText}
+                你不应该谈到任何有关政治的内容, 如果有关政治, 你应该回复 '我不被允许讨论政治相关内容'
 
                 {historyTextBuilder.ToString()}
 

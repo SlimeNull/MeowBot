@@ -58,7 +58,7 @@ namespace MeowBot
 
                 messageModels.Add(new
                 {
-                    role = davinciRole ?? "you",
+                    role = davinciRole ?? "assistant",
                     content = kv.Value
                 });
             }

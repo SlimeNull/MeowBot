@@ -57,6 +57,17 @@ internal class Program
         });
 
 
+        // 拦截黑名单
+        session.UseGroupMessage(async (context, next) =>
+        {
+            if (appConfig.BlockList != null && 
+                appConfig.BlockList.Contains(context.UserId))
+                return;
+
+            await next.Invoke();
+        });
+
+
         Dictionary<long, IOpenAiComplection> aiSessions = new Dictionary<long, IOpenAiComplection>();
         session.UseGroupMessage(async context =>
         {
@@ -151,7 +162,7 @@ internal class Program
                         };
 
                         bool inWhiteList = false;
-                        if (appConfig.WhiteList != null && appConfig.WhiteList.Contains(context.UserId))
+                        if (appConfig.AllowList != null && appConfig.AllowList.Contains(context.UserId))
                             inWhiteList = true;
 
                         if (!inWhiteList)
@@ -162,7 +173,7 @@ internal class Program
                     else
                     {
                         bool dequeue = false;
-                        if (aiSession.History.Count > maxHistoryCount && (appConfig.WhiteList == null || !appConfig.WhiteList.Contains(context.UserId)))
+                        if (aiSession.History.Count > maxHistoryCount && (appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)))
                             dequeue = true;
 
                         if (dequeue)

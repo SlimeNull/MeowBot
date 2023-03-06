@@ -18,7 +18,8 @@ namespace MeowBot
 
         public static string DefaultChatCompletionApiUrl { get; } = "https://api.openai.com/v1/chat/completions";
 
-        public long[]? WhiteList { get; set; }
+        public long[]? AllowList { get; set; }
+        public long[]? BlockList { get; set; }
         public long[]? GroupWhiteList { get; set; }
     }
 }

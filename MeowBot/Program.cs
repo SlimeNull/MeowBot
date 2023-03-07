@@ -1,11 +1,18 @@
 ﻿using EleCho.GoCqHttpSdk;
 using EleCho.GoCqHttpSdk.Message;
 using MeowBot;
+using NLog;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 internal class Program
 {
+
+    /// <summary>
+    /// 读个配置, 好凉凉~
+    /// </summary>
+    /// <param name="appConfig"></param>
+    /// <returns></returns>
     private static bool TryLoadConfig([NotNullWhen(true)] out AppConfig? appConfig)
     {
         if (!File.Exists(AppConfig.Filename))
@@ -32,6 +39,11 @@ internal class Program
         return true;
     }
 
+    /// <summary>
+    /// 代码过于屎山, 容易引起不适
+    /// </summary>
+    /// <param name="args"></param>
+    /// <returns></returns>
     private static async Task Main(string[] args)
     {
         if (!TryLoadConfig(out var appConfig))
@@ -205,20 +217,22 @@ internal class Program
                                 });
                             }
                         }
-                        catch
+                        catch (Exception ex)
                         {
                             await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
                                 {
                                     new CqAtMsg(context.UserId),
                                     new CqTextMsg("(请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人)")
                                 });
+
+                            await Console.Out.WriteLineAsync($"Exception: {ex}");
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                await Console.Out.WriteLineAsync($"Exception: {ex}");
+                await Console.Out.WriteLineAsync($"{ex}");
             }
         });
 
@@ -235,6 +249,8 @@ internal class Program
             await session.ApproveGroupRequestAsync(context.Flag, context.GroupRequestType);
         });
 
+        AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
         while (true)
         {
             try
@@ -242,11 +258,29 @@ internal class Program
                 await session.StartAsync();
                 await Console.Out.WriteLineAsync("连接完毕啦 ヾ(≧▽≦*)o");
                 await session.WaitForShutdownAsync();
+
+                await Console.Out.WriteLineAsync("连接已结束... 5s 后重连");
+                await Task.Delay(5000);
             }
             catch (Exception ex)
             {
-                await Console.Out.WriteLineAsync($"Exception: {ex}");
+                await Console.Out.WriteLineAsync($"{ex}");
             }
+        }
+    }
+
+
+    /// <summary>
+    /// 异常了捏~
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        Console.WriteLine("出现了不可预知的异常");
+        if (e.ExceptionObject is Exception ex)
+        {
+            Console.WriteLine(ex);
         }
     }
 }

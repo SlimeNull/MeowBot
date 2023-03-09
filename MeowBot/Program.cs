@@ -39,6 +39,18 @@ internal class Program
         return true;
     }
 
+    class AiComplectionSessionStorage
+    {
+        public AiComplectionSessionStorage(IOpenAiComplection Session, DateTime LastUseTime)
+        {
+            this.Session = Session;
+            this.LastUseTime = LastUseTime;
+        }
+
+        public IOpenAiComplection Session { get; }
+        public DateTime LastUseTime { get; set; }
+    }
+
     /// <summary>
     /// 代码过于屎山, 容易引起不适
     /// </summary>
@@ -80,7 +92,7 @@ internal class Program
         });
 
 
-        Dictionary<long, IOpenAiComplection> aiSessions = new Dictionary<long, IOpenAiComplection>();
+        Dictionary<long, AiComplectionSessionStorage> aiSessions = new Dictionary<long, AiComplectionSessionStorage>();
         session.UseGroupMessage(async context =>
         {
             int maxHistoryCount = 50;
@@ -91,13 +103,32 @@ internal class Program
                 {
                     string msgTxt = context.Message.Text.Trim();
 
-                    if (!aiSessions.TryGetValue(context.UserId, out IOpenAiComplection? aiSession))
+                    if (!aiSessions.TryGetValue(context.UserId, out AiComplectionSessionStorage aiSession))
                     {
-                        aiSessions[context.UserId] = aiSession = new OpenAiChatCompletionSession(appConfig.ApiKey, appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl);
+                        aiSessions[context.UserId] = aiSession = new(new OpenAiChatCompletionSession(appConfig.ApiKey, appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl), DateTime.MinValue);
 
-                        if (aiSession is OpenAiChatCompletionSession chatCompletionSession)
+                        if (aiSession.Session is OpenAiChatCompletionSession chatCompletionSession)
                             chatCompletionSession.InitCatGirl();
                     }
+
+                    if ((appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)) && (DateTime.Now - aiSession.LastUseTime).TotalSeconds < 30)
+                    {
+                        double diffSeconds = (DateTime.Now - aiSession.LastUseTime).TotalSeconds;
+                        string helpText =
+                            $"""
+                            (你不在机器人白名单内, 30秒内仅允许使用一次. 还剩下 {30 - diffSeconds} 秒)
+                            """;
+
+                        await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                        {
+                            new CqAtMsg(context.UserId),
+                            new CqTextMsg(helpText)
+                        });
+
+                        return;
+                    }
+
+                    aiSession.LastUseTime = DateTime.Now;
 
                     if (msgTxt.StartsWith("#help", StringComparison.OrdinalIgnoreCase))
                     {
@@ -120,7 +151,7 @@ internal class Program
                     }
                     else if (msgTxt.StartsWith("#reset", StringComparison.OrdinalIgnoreCase))
                     {
-                        aiSession.Reset();
+                        aiSession.Session.Reset();
                         await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
                         {
                             new CqAtMsg(context.UserId),
@@ -137,7 +168,7 @@ internal class Program
                         string? initText = OpenAiCompletionInitTexts.GetFromName(role);
                         if (initText != null)
                         {
-                            aiSession.InitWithText(initText);
+                            aiSession.Session.InitWithText(initText);
                             await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
                             {
                                 new CqAtMsg(context.UserId),
@@ -157,20 +188,20 @@ internal class Program
                              msgTxt.StartsWith("#custom-role ", StringComparison.OrdinalIgnoreCase))
                     {
                         string initText = msgTxt.Substring(13);
-                        aiSession.InitWithText(initText);
+                        aiSession.Session.InitWithText(initText);
                         await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
                             {
                                 new CqAtMsg(context.UserId),
                                 new CqTextMsg($"> 角色已更新:\n{initText}")
                             });
-                        aiSession.Reset();
+                        aiSession.Session.Reset();
                     }
                     else if (msgTxt.StartsWith("#history", StringComparison.OrdinalIgnoreCase))
                     {
                         CqMessage message = new CqMessage()
                         {
                             new CqAtMsg(context.UserId),
-                            new CqTextMsg($"> 历史记录: {aiSession.History.Count}条")
+                            new CqTextMsg($"> 历史记录: {aiSession.Session.History.Count}条")
                         };
 
                         bool inWhiteList = false;
@@ -185,16 +216,16 @@ internal class Program
                     else
                     {
                         bool dequeue = false;
-                        if (aiSession.History.Count > maxHistoryCount && (appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)))
+                        if (aiSession.Session.History.Count > maxHistoryCount && (appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)))
                             dequeue = true;
 
                         if (dequeue)
-                            while (aiSession.History.Count > maxHistoryCount)
-                                aiSession.History.Dequeue();
+                            while (aiSession.Session.History.Count > maxHistoryCount)
+                                aiSession.Session.History.Dequeue();
 
                         try
                         {
-                            string? result = await aiSession.AskAsync(context.Message.Text);
+                            string? result = await aiSession.Session.AskAsync(context.Message.Text);
                             if (result != null)
                             {
                                 CqMessage message = new CqMessage()

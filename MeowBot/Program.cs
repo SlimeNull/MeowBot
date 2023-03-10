@@ -103,7 +103,7 @@ internal class Program
                 {
                     string msgTxt = context.Message.Text.Trim();
 
-                    if (!aiSessions.TryGetValue(context.UserId, out AiComplectionSessionStorage aiSession))
+                    if (!aiSessions.TryGetValue(context.UserId, out AiComplectionSessionStorage? aiSession))
                     {
                         aiSessions[context.UserId] = aiSession = new(new OpenAiChatCompletionSession(appConfig.ApiKey, appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl), DateTime.MinValue);
 
@@ -111,12 +111,12 @@ internal class Program
                             chatCompletionSession.InitCatGirl();
                     }
 
-                    if ((appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)) && (DateTime.Now - aiSession.LastUseTime).TotalSeconds < 30)
+                    if ((appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)) && (DateTime.Now - aiSession.LastUseTime).TotalSeconds < appConfig.UseTimeLimit)
                     {
                         double diffSeconds = (DateTime.Now - aiSession.LastUseTime).TotalSeconds;
                         string helpText =
                             $"""
-                            (你不在机器人白名单内, 30秒内仅允许使用一次. 还剩下 {30 - diffSeconds} 秒)
+                            (你不在机器人白名单内, {appConfig.UseTimeLimit}秒内仅允许使用一次. 还剩下 {appConfig.UseTimeLimit - diffSeconds:0.00} 秒)
                             """;
 
                         await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
@@ -127,8 +127,6 @@ internal class Program
 
                         return;
                     }
-
-                    aiSession.LastUseTime = DateTime.Now;
 
                     if (msgTxt.StartsWith("#help", StringComparison.OrdinalIgnoreCase))
                     {
@@ -238,6 +236,8 @@ internal class Program
                                     message.WithTail($"(消息历史记录超过 {maxHistoryCount} 条, 已删去多余的历史记录)");
 
                                 await session.SendGroupMessageAsync(context.GroupId, message);
+
+                                aiSession.LastUseTime = DateTime.Now;
                             }
                             else
                             {

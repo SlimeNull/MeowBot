@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using RustSharp;
+using System.Net.Http.Json;
 
 namespace MeowBot
 {
@@ -15,12 +16,15 @@ namespace MeowBot
 
         public string ApiKey { get; }
         public string ApiUrl { get; }
+        public string Model { get; }
+
         public Queue<KeyValuePair<string, string>> History => history;
 
-        public OpenAiChatCompletionSession(string apiKey, string apiUrl)
+        public OpenAiChatCompletionSession(string apiKey, string apiUrl, string model)
         {
             ApiKey = apiKey;
             ApiUrl = apiUrl;
+            Model = model;
         }
 
         public void InitCatGirl()
@@ -38,7 +42,7 @@ namespace MeowBot
             initText = text;
         }
 
-        public async Task<string?> AskAsync(string question)
+        public async Task<Result<string, string>> AskAsync(string question)
         {
             List<object> messageModels = new List<object>();
 
@@ -87,7 +91,7 @@ namespace MeowBot
                     Content = JsonContent.Create(
                         new
                         {
-                            model = "gpt-3.5-turbo-0301",
+                            model = Model,
                             messages = messageModels,
                             max_tokens = 2048,
                             temperature = 0.5,
@@ -97,47 +101,60 @@ namespace MeowBot
             var response = await Utils.GlobalHttpClient.SendAsync(request);
             var davinci_rst = await response.Content.ReadFromJsonAsync<davinci_result>();
             if (davinci_rst == null)
-                return null;
+                return Result<string, string>.Err("API 无返回");
+
+            if (davinci_rst.error != null)
+                return Result<string, string>.Err($"API 返回错误: {davinci_rst.error.message}");
+
+            if (davinci_rst.choices == null)
+                return Result<string, string>.Err("API 响应无结果");
 
             var davinci_rst_message =
                 davinci_rst.choices.FirstOrDefault()?.message;
 
             if (davinci_rst_message == null)
-                return null;
+                return Result<string, string>.Err("API 响应结果无内容");
 
             davinciRole = davinci_rst_message.role;
 
             history.Enqueue(new KeyValuePair<string, string>(question, davinci_rst_message.content));
 
-            return davinci_rst_message.content;
+            return Result<string, string>.Ok(davinci_rst_message.content);
         }
 
         public void Reset() => history.Clear();
 
-        public class davinci_result
+        public record class davinci_result
         {
-            public class davinci_result_choice
+            public record class davinci_result_choice
             {
-                public class davinci_result_choice_message
+                public record class davinci_result_choice_message
                 {
-                    public string role { get; set; }
-                    public string content { get; set; }
+                    public string role { get; set; } = string.Empty;
+                    public string content { get; set; } = string.Empty;
                 }
                 public int index { get; set; }
-                public davinci_result_choice_message message { get; set; }
-                public string finish_reason { get; set; }
+                public davinci_result_choice_message? message { get; set; }
+                public string finish_reason { get; set; } = string.Empty;
             }
-            public class davinci_result_usage
+            public record class davinci_result_usage
             {
                 public int prompt_tokens { get; set; }
                 public int completion_tokens { get; set; }
                 public int total_tokens { get; set; }
             }
-            public string id { get; set; }
-            public string @object { get; set; }
+            public record class davinci_result_error
+            {
+                public string message { get; set; } = string.Empty;
+                public string type { get; set; } = string.Empty;
+            }
+
+            public string id { get; set; } = string.Empty;
+            public string @object { get; set; } = string.Empty;
             public int created { get; set; }
-            public davinci_result_choice[] choices { get; set; }
-            public davinci_result_usage usage { get; set; }
+            public davinci_result_choice[]? choices { get; set; }
+            public davinci_result_usage? usage { get; set; }
+            public davinci_result_error? error { get; set; }
         }
 
     }

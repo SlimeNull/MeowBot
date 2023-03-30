@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RustSharp;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Json;
@@ -42,7 +43,7 @@ namespace MeowBot
             initText = text;
         }
 
-        public async Task<string?> AskAsync(string question)
+        public async Task<Result<string, string>> AskAsync(string question)
         {
             StringBuilder historyTextBuilder = new StringBuilder();
             foreach (var kv in history)
@@ -86,19 +87,20 @@ namespace MeowBot
             var davinci_rst = await response.Content.ReadFromJsonAsync<davinci_result>();
 
             if (davinci_rst == null)
-                return null;
+                return Result<string, string>.Err("API 无返回");
 
             var davinci_rst_txt =
                 davinci_rst.choices.FirstOrDefault()?.text;
 
             if (davinci_rst_txt == null)
-                return null;
+                return Result<string, string>.Err("API 返回无内容");
 
             history.Enqueue(new KeyValuePair<string, string>(question, davinci_rst_txt));
-            return davinci_rst_txt;
+            return Result<string, string>.Ok(davinci_rst_txt);
         }
 
         public void Reset() => history.Clear();
+        Task<Result<string, string>> IOpenAiComplection.AskAsync(string content) => throw new NotImplementedException();
 
         public class davinci_result
         {

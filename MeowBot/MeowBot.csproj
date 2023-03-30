@@ -9,8 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="EleCho.GoCqHttpSdk" Version="1.0.5" />
+    <PackageReference Include="EleCho.GoCqHttpSdk" Version="1.0.8" />
     <PackageReference Include="NLog" Version="5.1.2" />
+    <PackageReference Include="RustSharp" Version="1.0.1" />
   </ItemGroup>
 
 </Project>

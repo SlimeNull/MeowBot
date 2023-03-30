@@ -2,10 +2,12 @@
 using EleCho.GoCqHttpSdk.Message;
 using MeowBot;
 using NLog;
+using RustSharp;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection.Metadata;
 using System.Text.Json;
 
-internal class Program
+internal partial class Program
 {
 
     /// <summary>
@@ -17,8 +19,11 @@ internal class Program
     {
         if (!File.Exists(AppConfig.Filename))
         {
-            using FileStream fs = File.OpenWrite(AppConfig.Filename);
-            JsonSerializer.Serialize(fs, new AppConfig(), JsonHelper.Options);
+            using (FileStream fs = File.OpenWrite(AppConfig.Filename))
+            {
+                JsonSerializer.Serialize(fs, new AppConfig(), JsonHelper.Options);
+            }
+
             Console.WriteLine("配置文件已生成, 请编辑后启动程序");
             Utils.PressAnyKeyToContinue();
 
@@ -37,18 +42,6 @@ internal class Program
         }
 
         return true;
-    }
-
-    class AiComplectionSessionStorage
-    {
-        public AiComplectionSessionStorage(IOpenAiComplection Session, DateTime LastUseTime)
-        {
-            this.Session = Session;
-            this.LastUseTime = LastUseTime;
-        }
-
-        public IOpenAiComplection Session { get; }
-        public DateTime LastUseTime { get; set; }
     }
 
     /// <summary>
@@ -84,8 +77,7 @@ internal class Program
         // 拦截黑名单
         session.UseGroupMessage(async (context, next) =>
         {
-            if (appConfig.BlockList != null && 
-                appConfig.BlockList.Contains(context.UserId))
+            if (appConfig.BlockList.Contains(context.UserId))
                 return;
 
             await next.Invoke();
@@ -99,24 +91,27 @@ internal class Program
 
             try
             {
-                if (context.Message.Any(msg => msg is CqAtMsg atMsg && atMsg.QQ == context.SelfId))
+                if (context.Message.Any(msg => msg is CqAtMsg atMsg && atMsg.Target == context.SelfId))
                 {
                     string msgTxt = context.Message.Text.Trim();
 
                     if (!aiSessions.TryGetValue(context.UserId, out AiComplectionSessionStorage? aiSession))
                     {
-                        aiSessions[context.UserId] = aiSession = new(new OpenAiChatCompletionSession(appConfig.ApiKey, appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl), DateTime.MinValue);
+                        aiSessions[context.UserId] = aiSession = new(
+                            new OpenAiChatCompletionSession(
+                                appConfig.ApiKey,
+                                appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl,
+                                appConfig.GptModel ?? AppConfig.DefaultGptModel));
 
                         if (aiSession.Session is OpenAiChatCompletionSession chatCompletionSession)
                             chatCompletionSession.InitCatGirl();
                     }
 
-                    if ((appConfig.AllowList == null || !appConfig.AllowList.Contains(context.UserId)) && (DateTime.Now - aiSession.LastUseTime).TotalSeconds < appConfig.UseTimeLimit)
+                    if (!appConfig.AllowList.Contains(context.UserId) && aiSession.GetUsageCountInLastDuration(TimeSpan.FromMinutes(5)) >= 5)
                     {
-                        double diffSeconds = (DateTime.Now - aiSession.LastUseTime).TotalSeconds;
                         string helpText =
                             $"""
-                            (你不在机器人白名单内, {appConfig.UseTimeLimit}秒内仅允许使用一次. 还剩下 {appConfig.UseTimeLimit - diffSeconds:0.00} 秒)
+                            (你不在机器人白名单内, {appConfig.UsageLimitTime}秒内仅允许使用{appConfig.UsageLimitCount}次.)
                             """;
 
                         await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
@@ -223,29 +218,33 @@ internal class Program
 
                         try
                         {
-                            string? result = await aiSession.Session.AskAsync(context.Message.Text);
-                            if (result != null)
+                            Result<string, string> result =
+                                await aiSession.Session.AskAsync(context.Message.Text);
+
+                            switch (result)
                             {
-                                CqMessage message = new CqMessage()
-                                {
-                                    new CqAtMsg(context.UserId),
-                                    new CqTextMsg(result),
-                                };
+                                case OkResult<string, string> ok:
+                                    CqMessage message = new CqMessage()
+                                    {
+                                        new CqAtMsg(context.UserId),
+                                        new CqTextMsg(ok.Value),
+                                    };
 
-                                if (dequeue)
-                                    message.WithTail($"(消息历史记录超过 {maxHistoryCount} 条, 已删去多余的历史记录)");
+                                    if (dequeue)
+                                        message.WithTail($"(消息历史记录超过 {maxHistoryCount} 条, 已删去多余的历史记录)");
 
-                                await session.SendGroupMessageAsync(context.GroupId, message);
+                                    await session.SendGroupMessageAsync(context.GroupId, message);
 
-                                aiSession.LastUseTime = DateTime.Now;
-                            }
-                            else
-                            {
-                                await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
-                                {
-                                    new CqAtMsg(context.UserId),
-                                    new CqTextMsg("(请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人)")
-                                });
+                                    aiSession.AddUsage();
+                                    break;
+                                case ErrResult<string, string> err:
+                                    await session.SendGroupMessageAsync(context.GroupId, new CqMessage()
+                                    {
+                                        new CqAtMsg(context.UserId),
+                                        new CqTextMsg($"(请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人. {err.Value})")
+                                    });
+                                    break;
+
                             }
                         }
                         catch (Exception ex)
@@ -275,9 +274,13 @@ internal class Program
             }
         });
 
+        // 群邀请
         session.UseGroupRequest(async context =>
         {
-            await session.ApproveGroupRequestAsync(context.Flag, context.GroupRequestType);
+            if (appConfig.AllowList.Contains(context.UserId))
+                await session.ApproveGroupRequestAsync(context.Flag, context.GroupRequestType);
+            else
+                await session.RejectGroupRequestAsync(context.Flag, context.GroupRequestType, "只有白名单用户才可以邀请小猫到群聊");
         });
 
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -288,6 +291,20 @@ internal class Program
             {
                 await session.StartAsync();
                 await Console.Out.WriteLineAsync("连接完毕啦 ヾ(≧▽≦*)o");
+
+                await Console.Out.WriteLineAsync($"模型: {appConfig.GptModel ?? AppConfig.DefaultGptModel}");
+                await Console.Out.WriteLineAsync($"聊天 API: {appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl}");
+                await Console.Out.WriteLineAsync($"UsageLimitTime: {appConfig.UsageLimitTime}");
+                await Console.Out.WriteLineAsync($"UsageLimitCount: {appConfig.UsageLimitCount}");
+
+                await Console.Out.WriteLineAsync("白名单:");
+                foreach (var item in appConfig.AllowList)
+                    await Console.Out.WriteLineAsync($" | {item}");
+
+                await Console.Out.WriteLineAsync("黑名单:");
+                foreach (var item in appConfig.BlockList)
+                    await Console.Out.WriteLineAsync($" | {item}");
+
                 await session.WaitForShutdownAsync();
 
                 await Console.Out.WriteLineAsync("连接已结束... 5s 后重连");
@@ -296,6 +313,8 @@ internal class Program
             catch (Exception ex)
             {
                 await Console.Out.WriteLineAsync($"{ex}");
+                await Console.Out.WriteLineAsync("连接已结束... 2s 后重连");
+                await Task.Delay(2000);
             }
         }
     }

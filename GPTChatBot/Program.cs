@@ -92,7 +92,9 @@ internal static partial class Program
         var serializerOptions = new JsonSerializerOptions()
         {
             TypeInfoResolver = AppConfigJsonSerializerContext.Default,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            WriteIndented = true,
+            IgnoreReadOnlyProperties = true
         };
 
         if (!File.Exists(AppConfig.Filename))
@@ -118,10 +120,10 @@ internal static partial class Program
     }
 
     /// <summary>
-    /// 启动与GoCQHTTP的Socket会话，并在退出时自动重启
+    /// 启动与Go-CqHttp的Socket会话，并在退出时自动重启
     /// </summary>
-    /// <param name="session"></param>
-    /// <param name="appConfig"></param>
+    /// <param name="session">当前Go-CqHttp的WebSocket会话</param>
+    /// <param name="appConfig">应用程序配置</param>
     private static async Task MainSession(CqWsSession session, AppConfig appConfig)
     {
         while (true)

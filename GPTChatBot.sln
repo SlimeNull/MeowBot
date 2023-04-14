@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33414.496
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MeowBot", "MeowBot\MeowBot.csproj", "{B062510A-5A01-4D29-AF6F-383E573AAD90}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GPTChatBot", "GPTChatBot\GPTChatBot.csproj", "{B062510A-5A01-4D29-AF6F-383E573AAD90}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2599DE29-118D-482F-A67E-758B3AC99DAC}"
 	ProjectSection(SolutionItems) = preProject

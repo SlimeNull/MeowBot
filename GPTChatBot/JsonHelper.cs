@@ -7,4 +7,4 @@ namespace GPTChatBot;
 /// </summary>
 [JsonSerializable(typeof(AppConfig))]
 [JsonSourceGenerationOptions(WriteIndented = true, IgnoreReadOnlyProperties = true)]
-public partial class AppConfigJsonSerializerContext : JsonSerializerContext { }
+internal partial class AppConfigJsonSerializerContext : JsonSerializerContext { }

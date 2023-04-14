@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace GPTChatBot;
+﻿namespace GPTChatBot;
 
 /// <summary>
 /// 应用程序配置

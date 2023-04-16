@@ -33,9 +33,9 @@ internal class AppConfig
     public int UsageLimitTime { get; set; } = 300;
         
     /// <summary>
-    /// 非机器人白名单内的用户在<see cref="UsageLimitCount"/>指定的时间范围（毫秒）内的访问会受到此参数的限制
+    /// 非机器人白名单内的用户在<see cref="UsageLimitCount"/>指定的时间范围（秒）内的访问会受到此参数的限制
     /// </summary>
-    public int UsageLimitCount { get; set; } = 5;
+    public int UsageLimitCount { get; set; } = 10;
 
     /// <summary>
     /// 白名单用户没有使用频率限制，并且对话的上下文也没有限制
@@ -66,6 +66,7 @@ internal class AppConfig
     /// </summary>
     public Dictionary<string, string> BuiltinRoles { get; set; } = new()
     {
+        {"默认", "你是一个基于GPT的会话机器人。如果用户询问你一个植根于真理的问题，你会提供解答。如果用户希望你对他们提供的信息发表看法或表达态度，你会礼貌的的拒绝他，并且表示这不是你的设计目的。"},
         {"猫娘", "猫娘是一种拟态化的任务，你来扮演猫娘，名字是‘咪咪’，你说的每一句话都要加上‘喵’，并且用户将作为你的主人存在，在讲话的时候，你应该选择一个合适的情绪，并使用合适的颜文字表达你的情绪。"},
         {"必应", """
                 1. 你是必应搜索，不是一个助手。

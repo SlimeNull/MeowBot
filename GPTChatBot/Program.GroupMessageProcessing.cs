@@ -85,7 +85,7 @@ internal static partial class Program
                         await session.SendGroupMessageAsync(context.GroupId, new()
                         {
                             new CqAtMsg(context.UserId),
-                            new CqTextMsg($"请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人\n{errResult.Value}")
+                            new CqTextMsg($"请求失败，请重新尝试，你也可以使用 #reset 重置机器人\n{errResult.Value}")
                         });
                         break;
                 }
@@ -95,7 +95,7 @@ internal static partial class Program
                 await session.SendGroupMessageAsync(context.GroupId, new()
                 {
                     new CqAtMsg(context.UserId),
-                    new CqTextMsg($"请求失败, 请重新尝试, 你也可以使用 #reset 重置机器人\n{ex.Data}")
+                    new CqTextMsg($"请求失败，请重新尝试，你也可以使用 #reset 重置机器人\n{ex.Data}")
                 });
 
                 await Console.Out.WriteLineAsync($"Exception: {ex}");
@@ -121,15 +121,17 @@ internal static partial class Program
             case var _ when msgTxt.StartsWith("#help"):
                 var helpText =
                     $"""
+
                     操作指令：
                     ----------------------------------
-                    #role:<角色>				切换一个的GPT角色预设
-                    #custom-role:<身份信息>	通过传入用于初始化GPT自我角色的提示性信息来自定义角色性格
-                    #reset					重置聊天对话的上下文信息
+                    #role:<切换一个的GPT角色预设>				
+                    #custom-role:<通过传入用于初始化GPT自我角色的提示性信息来自定义角色性格>	
+                    #reset:重置聊天对话的上下文信息
                     ----------------------------------
                     ！注意, 普通用户最多记忆{MaxHistoryCount}条聊天对话的上下文信息
                     ----------------------------------
                     以下是所有可用的GPT角色预设：
+
                     """;
 
                 var sb = new StringBuilder(helpText);
@@ -194,7 +196,7 @@ internal static partial class Program
                 var message = new CqMessage()
                 {
                     new CqAtMsg(context.UserId),
-                    new CqTextMsg($"历史记录: {aiSession.Session.History.Count}条")
+                    new CqTextMsg($"历史记录：{aiSession.Session.History.Count}条")
                 };
 
                 var inWhiteList = appConfig.AccountWhiteList.Contains(context.UserId);

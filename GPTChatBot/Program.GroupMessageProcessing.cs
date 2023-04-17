@@ -129,8 +129,9 @@ internal static partial class Program
 
                     操作指令：
                     ----------------------------------
-                    #role:<切换一个的GPT角色预设>				
-                    #custom-role:<通过传入用于初始化GPT自我角色的提示性信息来自定义角色性格>	
+                    #temperature:<设置AI的应答气温(0~1)，越高的值会带来越随机的结果，反之则会带来越确定以及集中的结果>
+                    #role:<切换一个的GPT角色预设>
+                    #custom-role:<通过传入用于初始化GPT自我角色的提示性信息来自定义角色性格>
                     #reset:重置聊天对话的上下文信息
                     ----------------------------------
                     ！注意, 普通用户最多记忆{MaxHistoryCount}条聊天对话的上下文信息
@@ -159,6 +160,27 @@ internal static partial class Program
                 {
                     new CqAtMsg(context.UserId),
                     new CqTextMsg("会话已重置")
+                });
+
+                break;
+            case var _ when msgTxt.StartsWith("#temperature:"):
+
+                var potentialTemperature = msgTxt[13..].Trim();
+                if (!float.TryParse(potentialTemperature, out var validFloatValue) || validFloatValue is < 0 or > 1)
+                {
+                    await session.SendGroupMessageAsync(context.GroupId, new()
+                    {
+                        new CqAtMsg(context.UserId),
+                        new CqTextMsg($"无法将({potentialTemperature})识别为范围在(0 ~ 1)中的浮点数！")
+                    }); 
+                    break;
+                }
+
+                aiSession.Session.UpdateChatBotTemperature(validFloatValue);
+                await session.SendGroupMessageAsync(context.GroupId, new()
+                {
+                    new CqAtMsg(context.UserId),
+                    new CqTextMsg($"温度已更新: {validFloatValue:N2}")
                 });
 
                 break;

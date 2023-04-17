@@ -139,7 +139,7 @@ internal partial class OpenAiChatCompletionSession : IOpenAiCompletion
         
         m_DavinciRole = davinciRstMessage.role;
         m_DialogHistory.Enqueue(new(question, davinciRstMessage.content));
-        await Console.Out.WriteLineAsync($"> \tOpen AI API 已回应，消耗({davinciRst.usage?.total_tokens}) token");
+        await Console.Out.WriteLineAsync($"> \tOpen AI API 已回应，消耗({davinciRst.usage?.total_tokens})token");
         return Result<string, string>.Ok(davinciRstMessage.content);
     }
 

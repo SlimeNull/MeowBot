@@ -34,9 +34,12 @@ internal static partial class Program
                     appConfig.OpenAiApiKey,
                     string.IsNullOrWhiteSpace(appConfig.ChatCompletionApiUrl) ? AppConfig.DefaultChatCompletionApiUrl : appConfig.ChatCompletionApiUrl,
                     string.IsNullOrWhiteSpace(appConfig.GptModel) ? AppConfig.DefaultGptModel : appConfig.GptModel,
-                    string.IsNullOrWhiteSpace(appConfig.GptRoleInitText) ? AppConfig.DefaultGptRoleText : appConfig.GptRoleInitText
+                    string.IsNullOrWhiteSpace(appConfig.GptRoleInitText) ? AppConfig.DefaultGptRoleText : appConfig.GptRoleInitText,
+                    appConfig
                 )
             );
+
+            await Console.Out.WriteLineAsync($"> 为用户 {context.Sender.Nickname}({context.UserId}) 创建OpenAI会话信息");
         }
 
         // 用户流量管理
@@ -48,11 +51,12 @@ internal static partial class Program
                 new CqAtMsg(context.UserId),
                 new CqTextMsg(helpText)
             });
+            await Console.Out.WriteLineAsync($"> 已拒绝用户 {context.Sender.Nickname}({context.UserId}) 的OpenAI会话请求（流量管理）");
         }
         // 用户命令处理 & GptAPI调用
         else if (!await HandlePotentialUserCommands(msgTxt, context, userAiSessionStorage, session, appConfig))
         {
-            var dequeue = userAiSessionStorage.Session.History.Count > MaxHistoryCount && (!appConfig.AccountWhiteList.Contains(context.UserId));
+            var dequeue = userAiSessionStorage.Session.History.Count > MaxHistoryCount && !appConfig.AccountWhiteList.Contains(context.UserId);
 
             if (dequeue)
             {
@@ -60,8 +64,8 @@ internal static partial class Program
                 {
                     userAiSessionStorage.Session.History.Dequeue();
                 }
+                await Console.Out.WriteLineAsync($"> 已裁剪用户 {context.Sender.Nickname}({context.UserId}) 的多余对话上下文信息");
             }
-
             try
             {
                 var result = await userAiSessionStorage.Session.AskAsync(context.Message.Text);
@@ -80,6 +84,7 @@ internal static partial class Program
                         await session.SendGroupMessageAsync(context.GroupId, message);
 
                         userAiSessionStorage.RecordApiUsage();
+                        await Console.Out.WriteLineAsync($"> 已回应用户 {context.Sender.Nickname}({context.UserId}) 的OpenAI会话");
                         break;
                     case ErrResult<string, string> errResult:
                         await session.SendGroupMessageAsync(context.GroupId, new()

@@ -1,4 +1,5 @@
-﻿using RustSharp;
+﻿using System.Globalization;
+using RustSharp;
 using System.Net.Http.Json;
 
 namespace GPTChatBot;
@@ -13,6 +14,8 @@ internal partial class OpenAiChatCompletionSession : IOpenAiCompletion
     /// </summary>
     private string m_RoleText;
     private string? m_DavinciRole;
+
+    private readonly AppConfig m_AppConfig;
     
     /// <summary>
     /// 用户和GPT的对话历史上下文信息
@@ -29,12 +32,13 @@ internal partial class OpenAiChatCompletionSession : IOpenAiCompletion
 
     public Queue<KeyValuePair<string, string>> History => m_DialogHistory;
 
-    public OpenAiChatCompletionSession(string apiKey, string apiUrl, string model, string roleText)
+    public OpenAiChatCompletionSession(string apiKey, string apiUrl, string model, string roleText, AppConfig appConfig)
     {
         m_ApiKey = apiKey;
         m_ApiUrl = apiUrl;
         m_Model = model;
         m_RoleText = roleText;
+        m_AppConfig = appConfig;
     }
 
     /// <summary>
@@ -60,9 +64,14 @@ internal partial class OpenAiChatCompletionSession : IOpenAiCompletion
             new
             {
                 role = "system",
-                content = "你不应该谈到任何有关政治的内容, 如果有关政治, 你应该回复 '我不被允许讨论政治相关内容'"
+                content = $"当前区域（{CultureInfo.CurrentCulture.DisplayName}）时间为: {DateTime.Now:F}"
             }
         };
+
+        foreach (var systemCommand in m_AppConfig.SystemCommand)
+        {
+            messageModels.Add(new { role = "system", content = systemCommand });
+        }
 
         foreach (var kv in m_DialogHistory)
         {

@@ -11,7 +11,7 @@ internal static partial class Program
     /// 非白名单用户能够拥有的最大会话上下文数量
     /// </summary>
     private const int MaxHistoryCount = 50;
-    
+
     /// <summary>
     /// 应用程序主循环
     /// </summary>
@@ -47,10 +47,12 @@ internal static partial class Program
         // 配置私聊消息白名单过滤
         session.UsePrivateMessage(async (context, next) =>
         {
-            if (!appConfig.AccountWhiteList.Contains(context.UserId)) return;
+            if (!appConfig.AccountWhiteList.Contains(context.UserId) &&
+                !appConfig.AccountPrivateMessageList.Contains(context.UserId)) 
+                return;
             await next.Invoke();
         });
-        
+
         var aiSessions = new Dictionary<long, AiCompletionSessionStorage>();
 
         // 配置群消息处理
@@ -68,7 +70,7 @@ internal static partial class Program
                 Console.ForegroundColor = tempColor;
             }
         });
-        
+
         // 配置私聊消息处理
         session.UsePrivateMessage(async context =>
         {
@@ -93,11 +95,11 @@ internal static partial class Program
             else
                 await session.RejectGroupRequestAsync(context.Flag, context.GroupRequestType, string.Empty);
         });
-        
+
         // 配置加好友处理
         session.UseFriendRequest(async context =>
         {
-            if (appConfig.AccountWhiteList.Contains(context.UserId))
+            if (appConfig.AccountWhiteList.Contains(context.UserId) || appConfig.AccountPrivateMessageList.Contains(context.UserId))
                 await session.ApproveFriendRequestAsync(context.Flag, null);
             else
                 await session.RejectFriendRequestAsync(context.Flag);
@@ -202,5 +204,4 @@ internal static partial class Program
             }
         }
     }
-    
 }

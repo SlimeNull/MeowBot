@@ -43,6 +43,11 @@ internal class AppConfig
     public long[] AccountWhiteList { get; set; } = Array.Empty<long>();
         
     /// <summary>
+    /// 可以私聊的用户名单，此类用户以及白名单内的用户可以加Bot为好友并且私聊
+    /// </summary>
+    public long[] AccountPrivateMessageList { get; set; } = Array.Empty<long>();
+        
+    /// <summary>
     /// 黑名单用户无法获得任何服务
     /// </summary>
     public long[] AccountBlackList { get; set; } = Array.Empty<long>();

@@ -37,13 +37,20 @@ internal static partial class Program
         // 初始化QQBot会话
         var session = new CqWsSession(new() { BaseUri = new(appConfig.BotWebSocketUri) });
 
-        // 配置拦截黑名单
+        // 配置群组消息黑名单拦截
         session.UseGroupMessage(async (context, next) =>
         {
             if (appConfig.AccountBlackList.Contains(context.UserId)) return;
             await next.Invoke();
         });
 
+        // 配置私聊消息白名单过滤
+        session.UsePrivateMessage(async (context, next) =>
+        {
+            if (!appConfig.AccountWhiteList.Contains(context.UserId)) return;
+            await next.Invoke();
+        });
+        
         var aiSessions = new Dictionary<long, AiCompletionSessionStorage>();
 
         // 配置群消息处理
@@ -55,7 +62,26 @@ internal static partial class Program
             }
             catch (Exception ex)
             {
+                var tempColor = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Magenta;
                 await Console.Out.WriteLineAsync(ex.ToString());
+                Console.ForegroundColor = tempColor;
+            }
+        });
+        
+        // 配置私聊消息处理
+        session.UsePrivateMessage(async context =>
+        {
+            try
+            {
+                await OnPrivateMessageReceived(context, aiSessions, appConfig, session);
+            }
+            catch (Exception ex)
+            {
+                var tempColor = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                await Console.Out.WriteLineAsync(ex.ToString());
+                Console.ForegroundColor = tempColor;
             }
         });
 
@@ -65,7 +91,16 @@ internal static partial class Program
             if (appConfig.AccountWhiteList.Contains(context.UserId))
                 await session.ApproveGroupRequestAsync(context.Flag, context.GroupRequestType);
             else
-                await session.RejectGroupRequestAsync(context.Flag, context.GroupRequestType, "You are not inside the white list.");
+                await session.RejectGroupRequestAsync(context.Flag, context.GroupRequestType, string.Empty);
+        });
+        
+        // 配置加好友处理
+        session.UseFriendRequest(async context =>
+        {
+            if (appConfig.AccountWhiteList.Contains(context.UserId))
+                await session.ApproveFriendRequestAsync(context.Flag, null);
+            else
+                await session.RejectFriendRequestAsync(context.Flag);
         });
 
         // 配置异常处理

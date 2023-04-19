@@ -2,7 +2,7 @@
 using RustSharp;
 using System.Net.Http.Json;
 
-namespace GPTChatBot;
+namespace MeowBot;
 
 /// <summary>
 /// 一个逐用户的OpenAI对话，用于为一位用户提供包含上下文的GPT对话服务

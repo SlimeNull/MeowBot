@@ -1,6 +1,6 @@
 ﻿using RustSharp;
 
-namespace GPTChatBot;
+namespace MeowBot;
 
 internal interface IOpenAiCompletion
 {

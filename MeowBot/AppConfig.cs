@@ -1,4 +1,4 @@
-﻿namespace GPTChatBot;
+﻿namespace MeowBot;
 
 /// <summary>
 /// 应用程序配置

@@ -4,7 +4,7 @@ using EleCho.GoCqHttpSdk.Message;
 using EleCho.GoCqHttpSdk.Post;
 using RustSharp;
 
-namespace GPTChatBot;
+namespace MeowBot;
 
 internal static partial class Program
 {

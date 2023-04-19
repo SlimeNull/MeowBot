@@ -71,13 +71,13 @@ internal partial class OpenAiChatCompletionSession : IOpenAiCompletion
         {
             new
             {
-                role = "system",
+                role = "user",
                 content = m_RoleText
             },
             new
             {
-                role = "system",
-                content = $"当前时间为: {DateTime.Now:U}，当用户想你询问涉及到当前时间的情况时，优先将此时间转换为{CultureInfo.CurrentCulture.DisplayName}区域的当地时间并且使用。"
+                role = "user",
+                content = $"当前UTC时间为: {DateTime.Now:U}，当用户向你询问涉及到当前时间的情况时，将此时间转换为{CultureInfo.CurrentCulture.DisplayName}区域的当地时间并且使用。"
             }
         };
 

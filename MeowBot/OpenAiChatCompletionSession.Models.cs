@@ -1,4 +1,4 @@
-﻿namespace GPTChatBot;
+﻿namespace MeowBot;
 
 internal partial class OpenAiChatCompletionSession
 {

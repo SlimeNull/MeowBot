@@ -1,8 +1,8 @@
-# GPTChatBot
+# MeowBot
 
 ## 摘要
 
-此项目基于[SlimeNull](https://github.com/SlimeNull)的[小猫机器人](https://github.com/SlimeNull/MeowBot)项目，使用[.Net 7](https://learn.microsoft.com/zh-cn/dotnet/core/whats-new/dotnet-7)来调用OpenAI的Api，通过[EleCho.GoCqHttpSdk](https://github.com/OrgEleCho/EleCho.GoCqHttpSdk)来和[go-cqhttp]客户端通信处理消息收发。
+此项目使用[.Net 7](https://learn.microsoft.com/zh-cn/dotnet/core/whats-new/dotnet-7)来调用OpenAI的Api，通过[EleCho.GoCqHttpSdk](https://github.com/OrgEleCho/EleCho.GoCqHttpSdk)来和[go-cqhttp]客户端通信处理消息收发。
 
 ## 介绍
 

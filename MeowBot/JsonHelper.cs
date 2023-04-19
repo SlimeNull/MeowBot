@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace GPTChatBot;
+namespace MeowBot;
 
 /// <summary>
 /// 提供AOT的序列化服务

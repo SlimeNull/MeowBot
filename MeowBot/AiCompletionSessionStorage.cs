@@ -1,4 +1,4 @@
-﻿using GPTChatBot;
+﻿using MeowBot;
 
 /// <summary>
 /// 用于存储用户的OpenAi对话信息的数据结构

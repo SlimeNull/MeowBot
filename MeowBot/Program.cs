@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
-namespace GPTChatBot;
+namespace MeowBot;
 
 internal static partial class Program
 {

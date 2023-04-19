@@ -1,4 +1,4 @@
-﻿namespace GPTChatBot;
+﻿namespace MeowBot;
 
 internal static class Utils
 {

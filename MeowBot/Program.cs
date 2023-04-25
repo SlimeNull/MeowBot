@@ -112,6 +112,7 @@ internal static partial class Program
             if (exception.ExceptionObject is Exception ex)
             {
                 Console.WriteLine(ex);
+                Console.WriteLine();
             }
         };
 
@@ -171,7 +172,7 @@ internal static partial class Program
                 await session.StartAsync();
                 await Console.Out.WriteLineAsync("连接完成");
                 await Console.Out.WriteLineAsync($"模型: {appConfig.GptModel ?? AppConfig.DefaultGptModel}");
-                await Console.Out.WriteLineAsync($"聊天 API: {appConfig.ChatCompletionApiUrl ?? AppConfig.DefaultChatCompletionApiUrl}");
+                await Console.Out.WriteLineAsync($"API 主机: {appConfig.ApiHost ?? AppConfig.DefaultApiHost}");
                 await Console.Out.WriteLineAsync($"普通用户的使用频率限制在: {appConfig.UsageLimitTime}秒/{appConfig.UsageLimitCount}次");
 
                 await Console.Out.WriteLineAsync("用户白名单:");

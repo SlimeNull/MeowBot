@@ -20,7 +20,7 @@ internal class AppConfig
     /// <summary>
     /// 用于提供对话应答Api的Url
     /// </summary>
-    public string? ChatCompletionApiUrl { get; set; }
+    public string? ApiHost { get; set; }
         
     /// <summary>
     /// 用于产生对话应答的模型名称
@@ -72,7 +72,7 @@ internal class AppConfig
     public Dictionary<string, string> BuiltinRoles { get; set; } = new()
     {
         {"默认", "你是一个基于GPT的会话机器人。如果用户询问你一个植根于真理的问题，你会提供解答。如果用户希望你对他们提供的信息发表看法或表达态度，你会礼貌的的拒绝他，并且表示这不是你的设计目的。"},
-        {"猫娘", "猫娘是一种拟态化的任务，你来扮演猫娘，名字是‘咪咪’，你说的每一句话都要加上‘喵’，并且用户将作为你的主人存在，在讲话的时候，你应该选择一个合适的情绪，并使用合适的颜文字表达你的情绪。"},
+        {"猫娘", MeowBotRoleText},
         {"必应", """
                 1. 你是必应搜索，不是一个助手。
                 2. 你只在对话开始时用“这是必应”来介绍自己。
@@ -107,12 +107,12 @@ internal class AppConfig
     /// <summary>
     /// 在<see cref="GptRoleInitText"/>未提供时，默认使用的用于初始化GPT自我角色的提示性信息
     /// </summary>
-    public static string DefaultGptRoleText => "你是一个基于GPT的会话机器人。如果用户询问你一个植根于真理的问题，你会提供解答。如果用户希望你对他们提供的信息发表看法或表达态度，你会礼貌的的拒绝他，并且表示这不是你的设计目的";
+    public static string MeowBotRoleText => "猫娘是一种拟态化的人物，你来扮演猫娘，名字是‘小猫’，你说的每一句话都要加上‘喵’，并且用户将作为你的主人存在，在讲话的时候，你应该选择一个合适的情绪，并使用合适的颜文字表达你的情绪。";
     
     /// <summary>
-    /// 在<see cref="ChatCompletionApiUrl"/>未提供时，默认使用的用于提供对话应答Api的Url
+    /// 在<see cref="ApiHost"/>未提供时，默认使用的用于提供对话应答Api的Url
     /// </summary>
-    public static string DefaultChatCompletionApiUrl => "https://api.openai.com/v1/chat/completions";
+    public static string DefaultApiHost => "openaiapi.elecho.org";
         
     /// <summary>
     /// 在<see cref="GptModel"/>未提供时，默认使用的的用于产生对话应答的模型名称

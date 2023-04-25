@@ -26,7 +26,7 @@ GPT服务|群员可以直接@此Bot并且提问，Bot会通过提供的OpenAi AP
 :-|:-|:-
  ```OpenAiApiKey``` |OpenAI API 密钥|用于调用 OpenAI API 的密钥
  ```BotWebSocketUri``` |go-cqhttp 通信WebSocket地址|此应用程序通过WebSocket来和go-cqhttp通信，对于默认本机通信，使用```ws://localhost:8080```
- ```ChatCompletionApiUrl``` |覆写OpenAI API 地址|当需要使用```https://api.openai.com/v1/chat/completions```以外的地址来调用OpenAI的API时，设置此项
+ ```ApiHost``` |OpenAI API 主机|当需要使用```api.openai.com```以外的主机来调用OpenAI的API时，设置此项
  ```GptModel``` |覆写OpenAI GPT模型|当调用OpenAI的API需要使用```gpt-3.5-turbo```以外的模型时，设置此项
  ```UsageLimitTime``` |非白名单用户限制（秒）|设定非白名单用户在多少秒内能够使用多少次API
  ```UsageLimitCount``` |非白名单用户限制（次数）|设定非白名单用户在多少秒内能够使用多少次API

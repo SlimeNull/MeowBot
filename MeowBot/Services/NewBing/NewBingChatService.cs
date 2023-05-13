@@ -229,6 +229,11 @@ internal class NewBingChatService : AiChatServiceBase
         return true;
     }
 
+    public override async ValueTask DisposeAsync()
+    {
+        m_HttpClient.Dispose();
+        await m_HubConnection.DisposeAsync();
+    }
 
     private static string FormatBingChatMessage(Message message, uint chatRound, uint maxChatRound)
     {

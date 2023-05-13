@@ -189,6 +189,12 @@ namespace MeowBot.Services.OpenAi
             return true;
         }
 
+        public override ValueTask DisposeAsync()
+        {
+            // m_Client.Dispose();
+            return ValueTask.CompletedTask;
+        }
+
 
         public OpenAiChatService(AppConfig config) : base(config)
         {

@@ -106,16 +106,20 @@ internal static partial class Program
                         """, true);
                     break;
                 case "#chat:NewBing":
-                    aiSession.Service = new NewBingChatService(appConfig);
-                    await aiSession.Service.StartServiceAsync();
-                    await sendMessageCallback($"聊天服务已切换到：NewBing", true);
+                    await SwitchToService("NewBing", new NewBingChatService(appConfig));
                     return true;
                 case "#chat:GPT":
-                    aiSession.Service = new OpenAiChatService(appConfig);
-                    await aiSession.Service.StartServiceAsync();
-                    await sendMessageCallback($"聊天服务已切换到：GPT", true);
+                    await SwitchToService("ChatGPT", new OpenAiChatService(appConfig));
                     return true;
             }
+        }
+
+        async Task SwitchToService(string serviceName, AiChatServiceBase newService)
+        {
+            await aiSession.Service.DisposeAsync();
+            aiSession.Service = newService;
+            await newService.StartServiceAsync();
+            await sendMessageCallback($"聊天服务已切换到：{serviceName}", true);
         }
 
 

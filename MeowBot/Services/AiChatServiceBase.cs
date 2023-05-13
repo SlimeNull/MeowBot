@@ -1,6 +1,6 @@
 namespace MeowBot.Services
 {
-    internal abstract class AiChatServiceBase
+    internal abstract class AiChatServiceBase : IAsyncDisposable
     {
         protected AppConfig AppConfig { get; }
 
@@ -25,6 +25,8 @@ namespace MeowBot.Services
         /// <param name="sendMessageCallback">执行消息发送动作的回调</param>
         /// <returns>用户输入的文本是否是当前服务所能处理的命令</returns>
         public abstract Task<bool> HandlePotentialUserCommands(string msgTxt, AppConfig appConfig, long userId, Func<string, bool, Task> sendMessageCallback);
+
+        public abstract ValueTask DisposeAsync();
     }
 
     internal readonly struct AskCommandArgsModel

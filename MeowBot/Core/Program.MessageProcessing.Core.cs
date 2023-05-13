@@ -107,10 +107,12 @@ internal static partial class Program
                     break;
                 case "#chat:NewBing":
                     aiSession.Service = new NewBingChatService(appConfig);
+                    await aiSession.Service.StartServiceAsync();
                     await sendMessageCallback($"聊天服务已切换到：NewBing", true);
                     return true;
                 case "#chat:GPT":
                     aiSession.Service = new OpenAiChatService(appConfig);
+                    await aiSession.Service.StartServiceAsync();
                     await sendMessageCallback($"聊天服务已切换到：GPT", true);
                     return true;
             }

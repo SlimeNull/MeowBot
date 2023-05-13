@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="EleCho.GoCqHttpSdk" Version="1.0.8" />
     <PackageReference Include="NLog" Version="5.1.2" />
+    <PackageReference Include="OpenAI-DotNet" Version="6.7.2" />
     <PackageReference Include="RustSharp" Version="1.0.1" />
     <PackageReference Include="System.Text.Json" Version="6.0.7" />
   </ItemGroup>

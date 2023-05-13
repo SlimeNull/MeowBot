@@ -1,7 +1,10 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
 using EleCho.GoCqHttpSdk;
 using EleCho.GoCqHttpSdk.Message;
 using EleCho.GoCqHttpSdk.Post;
+using OpenAI.Chat;
+using OpenAI.Models;
 using RustSharp;
 
 namespace MeowBot;
@@ -23,73 +26,97 @@ internal static partial class Program
         var msgTxt = incomingMessage.Trim();
 
         // 为新用户创建OpenAI会话
-        if (!aiSessionStorages.TryGetValue(userId, out var userAiSessionStorage))
+        if (!aiSessionStorages.TryGetValue(userId, out var aiSession))
         {
-            aiSessionStorages[userId] = userAiSessionStorage = new(
-                new OpenAiChatCompletionSession
-                (
-                    appConfig.OpenAiApiKey,
-                    string.IsNullOrWhiteSpace(appConfig.ChatCompletionApiUrl) ? AppConfig.DefaultChatCompletionApiUrl : appConfig.ChatCompletionApiUrl,
-                    string.IsNullOrWhiteSpace(appConfig.GptModel) ? AppConfig.DefaultGptModel : appConfig.GptModel,
-                    string.IsNullOrWhiteSpace(appConfig.GptRoleInitText) ? AppConfig.DefaultGptRoleText : appConfig.GptRoleInitText,
-                    appConfig
-                )
-            );
+            aiSessionStorages[userId] = aiSession = new(
+                new OpenAI.OpenAIClient(
+                    new OpenAI.OpenAIAuthentication(appConfig.OpenAiApiKey),
+                    new OpenAI.OpenAIClientSettings(appConfig.ApiHost ?? AppConfig.DefaultApiHost))
+            )
+            {
+                SystemMessage = AppConfig.MeowBotRoleText,
+                Temperature = .5
+            };
 
             await Console.Out.WriteLineAsync($"> 为用户 {userNickname}({userId}) 创建OpenAI会话信息");
         }
 
         // 用户流量管理
-        if (!appConfig.AccountWhiteList.Contains(userId) && userAiSessionStorage.GetUsageCountInLastDuration(TimeSpan.FromSeconds(appConfig.UsageLimitTime)) >= appConfig.UsageLimitCount)
+        if (!appConfig.AccountWhiteList.Contains(userId) && aiSession.GetUsageCountInLastDuration(TimeSpan.FromSeconds(appConfig.UsageLimitTime)) >= appConfig.UsageLimitCount)
         {
             var helpText = $"(你不在机器人白名单内, {appConfig.UsageLimitTime}秒内仅允许使用{appConfig.UsageLimitCount}次.)";
-            await sendMessageCallback(helpText);
+            await sendMessageCallback.Invoke(helpText);
             await Console.Out.WriteLineAsync($"> 已拒绝用户 {userNickname}({userId}) 的OpenAI会话请求（流量管理）");
         }
         // 用户命令处理 & GptAPI调用
-        else if (!await HandlePotentialUserCommands(msgTxt, userAiSessionStorage, appConfig, userId, sendMessageCallback))
+        else if (!await HandlePotentialUserCommands(msgTxt, aiSession, appConfig, userId, sendMessageCallback))
         {
-            var dequeue = userAiSessionStorage.Session.History.Count > MaxHistoryCount && !appConfig.AccountWhiteList.Contains(userId);
+            Debug.WriteLine("Message Received");
+
+            var dequeue = aiSession.ChatHistory.Count > MaxHistoryCount && !appConfig.AccountWhiteList.Contains(userId);
 
             if (dequeue)
             {
-                while (userAiSessionStorage.Session.History.Count > MaxHistoryCount)
+                while (aiSession.ChatHistory.Count > MaxHistoryCount)
                 {
-                    userAiSessionStorage.Session.History.Dequeue();
+                    aiSession.ChatHistory.Dequeue();
                 }
                 await Console.Out.WriteLineAsync($"> 已裁剪用户 {userNickname}({userId}) 的多余对话上下文信息");
             }
             try
             {
-                var result = await userAiSessionStorage.Session.AskAsync(msgTxt);
+                List<Message> messagesToRequest =
+                    new List<Message>();
 
-                switch (result)
+                messagesToRequest.Add(
+                    new Message(Role.System, aiSession.SystemMessage));
+
+                foreach (var sysmsg in appConfig.SystemCommand)
+                    messagesToRequest.Add(new Message(Role.System, sysmsg));
+
+                foreach (var msg in aiSession.ChatHistory)
+                    messagesToRequest.Add(msg);
+
+                try
                 {
-                    case OkResult<string, string> okResult:
-                        var openAiResult = new StringBuilder(okResult.Value);
+                    Message ask = new Message(Role.User, msgTxt);
+                    messagesToRequest.Add(ask);
 
-                        if (dequeue) openAiResult.Append(" (已裁剪对话上下文)");
+                    var result = await aiSession.Client.ChatEndpoint.GetCompletionAsync(
+                        new ChatRequest(messagesToRequest, model: Model.GPT3_5_Turbo, aiSession.Temperature));
 
-                        await sendMessageCallback(openAiResult.ToString());
+                    Debug.WriteLine("OpenAI OK");
 
-                        userAiSessionStorage.RecordApiUsage();
-                        await Console.Out.WriteLineAsync($"> 已回应用户 {userNickname}({userId}) 的OpenAI会话");
-                        break;
-                    case ErrResult<string, string> errResult:
-                        if (errResult.Value.Contains("This model's maximum context length is "))
-                        {
-                            await sendMessageCallback($"请求失败，对话上下文可能过长，请使用 #reset 重置机器人\n{errResult.Value}");
-                        }
-                        else
-                        {
-                            await sendMessageCallback($"请求失败，请重新尝试，你也可以使用 #reset 重置机器人\n{errResult.Value}");
-                        }
-                        break;
+                    Message answer = result.Choices.First().Message;
+                    var openAiResult = new StringBuilder(answer.Content);
+
+                    if (dequeue)
+                        openAiResult.Append(" (已裁剪对话上下文)");
+
+                    await sendMessageCallback.Invoke(openAiResult.ToString());
+
+                    aiSession.ChatHistory.Enqueue(ask);
+                    aiSession.ChatHistory.Enqueue(answer);
+                    aiSession.RecordApiUsage();
+
+                    await Console.Out.WriteLineAsync($"> 已回应用户 {userNickname}({userId}) 的OpenAI会话");
+                    Debug.WriteLine("GoCqHttp OK");
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.Contains("This model's maximum context length is "))
+                    {
+                        await sendMessageCallback.Invoke($"请求失败，对话上下文可能过长，请使用 #reset 重置机器人\n{ex.Message}");
+                    }
+                    else
+                    {
+                        await sendMessageCallback.Invoke($"请求失败，请重新尝试，你也可以使用 #reset 重置机器人\n{ex.Message}");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                await sendMessageCallback($"请求失败，请重新尝试，你也可以使用 #reset 重置机器人\n{ex.Data}");
+                await sendMessageCallback.Invoke($"请求失败，请重新尝试，你也可以使用 #reset 重置机器人\n{ex.Data}");
                 var tempColor = Console.ForegroundColor;
                 Console.ForegroundColor = ConsoleColor.Magenta;
                 await Console.Out.WriteLineAsync($"Exception: {ex}");
@@ -97,7 +124,7 @@ internal static partial class Program
             }
         }
     }
-    
+
     /// <summary>
     /// 检查用户输入的文本是否是给定的命令
     /// </summary>
@@ -113,7 +140,8 @@ internal static partial class Program
         long userId,
         Func<string, Task> sendMessageCallback)
     {
-        if (!msgTxt.StartsWith("#", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!msgTxt.StartsWith("#", StringComparison.OrdinalIgnoreCase))
+            return false;
 
         switch (msgTxt)
         {
@@ -139,54 +167,55 @@ internal static partial class Program
                     sb.AppendLine($"\t{builtinRolesKey}");
                 }
 
-                await sendMessageCallback(sb.ToString());
+                await sendMessageCallback.Invoke(sb.ToString());
                 break;
             case var _ when msgTxt.StartsWith("#reset"):
 
-                aiSession.Session.Reset();
-                await sendMessageCallback("会话已重置");
+                aiSession.ChatHistory.Clear();
+                await sendMessageCallback.Invoke("会话已重置");
 
                 break;
             case var _ when msgTxt.StartsWith("#temperature:"):
 
                 var potentialTemperature = msgTxt[13..].Trim();
-                if (!float.TryParse(potentialTemperature, out var validFloatValue) || validFloatValue is < 0 or > 1)
+                if (!double.TryParse(potentialTemperature, out var validFloatValue) || validFloatValue is < 0 or > 1)
                 {
-                    await sendMessageCallback($"无法将({potentialTemperature})识别为范围在(0 ~ 1)中的浮点数！");
+                    await sendMessageCallback.Invoke($"无法将({potentialTemperature})识别为范围在(0 ~ 1)中的浮点数！");
                     break;
                 }
 
-                aiSession.Session.UpdateChatBotTemperature(validFloatValue);
-                await sendMessageCallback($"会话温度已更新: {validFloatValue:N2}");
+                aiSession.Temperature = validFloatValue;
+                await sendMessageCallback.Invoke($"会话温度已更新: {validFloatValue:N2}");
 
                 break;
             case var _ when msgTxt.StartsWith("#role:"):
 
                 var role = msgTxt[6..].Trim();
-                if (appConfig.BuiltinRoles.TryGetValue(role, out var gptRoleCommand))
+                if (appConfig.BuiltinRoles.TryGetValue(role, out var gptRoleSystemMessage))
                 {
-                    aiSession.Session.UpdateChatBotRole(gptRoleCommand);
-                    await sendMessageCallback($"会话角色已更新: {role}");
+                    aiSession.SystemMessage = gptRoleSystemMessage;
+                    await sendMessageCallback.Invoke($"会话角色已更新: {role}");
                 }
                 else
                 {
-                    await sendMessageCallback($"找不到所选的角色");
+                    await sendMessageCallback.Invoke($"找不到所选的角色");
                 }
 
                 break;
             case var _ when msgTxt.StartsWith("#custom-role:"):
 
-                gptRoleCommand = msgTxt[13..];
-                aiSession.Session.UpdateChatBotRole(gptRoleCommand);
-                await sendMessageCallback($"自定义角色已更新");
-                aiSession.Session.Reset();
+                gptRoleSystemMessage = msgTxt[13..];
+                aiSession.SystemMessage = gptRoleSystemMessage;
+                await sendMessageCallback.Invoke($"自定义角色已更新");
+                aiSession.ChatHistory.Clear();
 
                 break;
             case var _ when msgTxt.StartsWith("#history"):
 
-                await sendMessageCallback($"历史记录：{aiSession.Session.History.Count}条");
+                await sendMessageCallback.Invoke($"历史记录：{aiSession.ChatHistory.Count}条");
                 var inWhiteList = appConfig.AccountWhiteList.Contains(userId);
-                if (!inWhiteList) await sendMessageCallback($"(您的聊天会话最多保留 {MaxHistoryCount} 条消息)");
+                if (!inWhiteList)
+                    await sendMessageCallback.Invoke($"(您的聊天会话最多保留 {MaxHistoryCount} 条消息)");
 
                 break;
             default:

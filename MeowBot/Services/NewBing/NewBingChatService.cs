@@ -221,6 +221,7 @@ internal class NewBingChatService : AiChatServiceBase
                 }
                 break;
             case "#reset":
+                m_IsStartOfSession = true;
                 await sendMessageCallback.Invoke("> NewBing: 会话已重置", true);
                 break;
             default:

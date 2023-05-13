@@ -237,8 +237,11 @@ internal class NewBingChatService : AiChatServiceBase
 
     private static string FormatBingChatMessage(Message message, uint chatRound, uint maxChatRound)
     {
-        var responseText = new StringBuilder(message.Text);
-            
+        if (string.IsNullOrWhiteSpace(message.Text)) return $"> Bing未提供回答。";
+        
+        var responseText = new StringBuilder(message.Text.TrimEnd('\n'));
+        responseText.AppendLine();    
+        
         if (message.SuggestedResponses != null && message.SuggestedResponses.Length != 0)
         {
             responseText.AppendLine("-----");
@@ -268,6 +271,7 @@ internal class NewBingChatService : AiChatServiceBase
             }
         }
 
+        responseText.AppendLine("-----");
         responseText.AppendLine($"对话轮次：({chatRound}/{maxChatRound})");
         
         return responseText.ToString().TrimEnd('\n');

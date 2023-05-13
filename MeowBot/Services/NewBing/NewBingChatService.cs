@@ -58,7 +58,7 @@ internal class NewBingChatService : AiChatServiceBase
 
         m_HubConnection.On<JsonDocument>("update", OnChatHubMessageUpdate);
 
-        m_BingStyle = BingChatCommand.BingStyle.Balanced;
+        m_BingStyle = BingChatCommand.BingStyle.Imaginative;
         m_IsStartOfSession = true;
         m_HasBingStartTyping = false;
         m_HasBingSpoken = false;

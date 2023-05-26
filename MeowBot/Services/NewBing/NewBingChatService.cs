@@ -7,10 +7,14 @@ namespace MeowBot.Services.NewBing;
 
 internal class NewBingChatService : AiChatServiceBase
 {
-    private readonly HubConnection m_HubConnection;
+    private HubConnection? m_HubConnection;
     private readonly HttpClient m_HttpClient = new();
     private readonly string m_NewBingCookie;
     private readonly byte[] m_TraceIdBuffer = new byte[16];
+    private readonly IHubConnectionBuilder m_HubConnectionBuilder;
+
+    private const int CTX_TIMEOUT = 10000;
+
     private readonly JsonSerializerOptions m_MessageResponseSerializerOptions = new()
     {
         TypeInfoResolver = MessageResponseJsonSerializerContext.Default
@@ -28,7 +32,7 @@ internal class NewBingChatService : AiChatServiceBase
     private Func<string, bool, Task>? m_SendMessageCallback;
     private Exception? m_PendingException;
     private BingChatCommand.BingStyle m_BingStyle;
-    
+
     public static bool CheckConfig(AppConfig config, out string? reason)
     {
         if (string.IsNullOrWhiteSpace(config.NewBingCookie))
@@ -44,7 +48,7 @@ internal class NewBingChatService : AiChatServiceBase
     public NewBingChatService(AppConfig config) : base(config)
     {
         m_NewBingCookie = config.NewBingCookie;
-        m_HubConnection = new HubConnectionBuilder()
+        m_HubConnectionBuilder = new HubConnectionBuilder()
             .WithUrl("https://sydney.bing.com/sydney/ChatHub",
                 HttpTransportType.WebSockets,
                 options => { options.SkipNegotiation = true; })
@@ -53,16 +57,7 @@ internal class NewBingChatService : AiChatServiceBase
                 TimeSpan.FromSeconds(3),
                 TimeSpan.FromSeconds(5),
                 TimeSpan.FromSeconds(10)
-            })
-            .Build();
-
-        m_HubConnection.On<JsonDocument>("update", OnChatHubMessageUpdate);
-
-        m_BingStyle = BingChatCommand.BingStyle.Imaginative;
-        m_IsStartOfSession = true;
-        m_HasBingStartTyping = false;
-        m_HasBingSpoken = false;
-        m_ChatRound = 0;
+            });
     }
 
     private void OnChatHubMessageUpdate(JsonDocument jsonDocument)
@@ -86,9 +81,9 @@ internal class NewBingChatService : AiChatServiceBase
         if (m_SendMessageCallback == null)
         {
             m_PendingException = new InvalidOperationException("内部流程错误（未提供发送信息的途径）");
-            return;         
+            return;
         }
-        
+
         if (m_LastBingResponse.Throttling != null)
         {
             m_ChatRound = m_LastBingResponse.Throttling.NumUserMessagesInConversation;
@@ -116,11 +111,88 @@ internal class NewBingChatService : AiChatServiceBase
 
     public override async Task StartServiceAsync()
     {
-        await m_HubConnection.StartAsync();
+        await InitializeConnection(new CancellationTokenSource(CTX_TIMEOUT).Token);
+    }
+
+    private async Task InitializeConnection(CancellationToken cancellationToken)
+    {
+        if(m_HubConnection != null) return;
+        
+        await Task.Yield();
+        
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                m_HubConnection = m_HubConnectionBuilder.Build();
+                m_HubConnection.On<JsonDocument>("update", OnChatHubMessageUpdate);
+                await m_HubConnection.StartAsync(cancellationToken);
+                break;
+            }
+            catch (Exception)
+            {
+                m_HubConnection = null;
+                throw;
+            }
+        }
+
+        if (m_HubConnection == null)
+        {
+            throw new InvalidOperationException();
+        }
+        
+        m_BingStyle = BingChatCommand.BingStyle.Imaginative;
+        m_IsStartOfSession = true;
+        m_HasBingStartTyping = false;
+        m_HasBingSpoken = false;
+        m_ChatRound = 0;
+
+        m_HubConnection.Closed += async exception =>
+        {
+            if (exception != null)
+            {
+                Console.WriteLine($"> 远端Bing服务器已关闭连接，正在执行重连！");
+                Console.WriteLine($"> {exception.Message}");
+            }
+            else
+            {
+                Console.WriteLine($"> Bing服务器已连接已结束，正在执行重连！");
+            }
+
+            try
+            {
+                // ReSharper disable once MethodSupportsCancellation
+                await Task.Delay(1000);
+                var cancellationTokenSource = new CancellationTokenSource(CTX_TIMEOUT);
+                await Task.Run(() => InitializeConnection(cancellationTokenSource.Token), cancellationTokenSource.Token);
+            }
+            catch (Exception)
+            {
+                await m_HubConnection.DisposeAsync();
+                m_HubConnection = null;
+                throw;
+            }
+        };
+
     }
 
     internal override async Task<Exception?> AskAsync(AskCommandArgsModel askCommandArgs, Func<string, bool, Task> sendMessageCallback)
     {
+        try
+        {
+            await InitializeConnection(new CancellationTokenSource(CTX_TIMEOUT).Token);
+        }
+        catch (Exception e)
+        {
+            return e;
+        }
+
+        if (m_HubConnection == null)
+        {
+            return new InvalidOperationException("无法初始化Bing对话应答服务");
+        }
+        
         m_SendMessageCallback = sendMessageCallback;
         if (m_IsStartOfSession)
         {
@@ -145,7 +217,9 @@ internal class NewBingChatService : AiChatServiceBase
         m_HasBingSpoken = false;
         m_HasBingStartTyping = false;
 
-        await foreach (var _ in m_HubConnection.StreamAsync<object>("chat", param)) { }
+        await foreach (var _ in m_HubConnection.StreamAsync<object>("chat", param))
+        {
+        }
 
         if (m_PendingException != null)
         {
@@ -154,7 +228,7 @@ internal class NewBingChatService : AiChatServiceBase
             return m_PendingException;
         }
 
-        if (m_LastBingResponse == null || m_LastBingResponse.Messages == null)
+        if (m_LastBingResponse?.Messages == null)
         {
             await sendMessageCallback("> 此轮会话已被Bing结束，下一次将建立新的对话。", true);
             m_IsStartOfSession = true;
@@ -164,13 +238,13 @@ internal class NewBingChatService : AiChatServiceBase
         var message = m_LastBingResponse.Messages[0];
         await sendMessageCallback(FormatBingChatMessage(message, m_ChatRound, m_MaxChatRound), true);
         m_LastBingResponse = null;
-        
+
         if (message.SuggestedResponses == null || message.SuggestedResponses.Length == 0)
         {
             await sendMessageCallback("> 此轮会话被Bing结束，下一次将建立新的对话。", false);
             m_IsStartOfSession = true;
         }
-        
+
         return null;
     }
 
@@ -219,6 +293,7 @@ internal class NewBingChatService : AiChatServiceBase
                         await sendMessageCallback($"> NewBing: 无法找到 {style} 风格", true);
                         break;
                 }
+
                 break;
             case "#reset":
                 m_IsStartOfSession = true;
@@ -227,22 +302,23 @@ internal class NewBingChatService : AiChatServiceBase
             default:
                 return false;
         }
+
         return true;
     }
 
     public override async ValueTask DisposeAsync()
     {
         m_HttpClient.Dispose();
-        await m_HubConnection.DisposeAsync();
+        if (m_HubConnection != null) await m_HubConnection.DisposeAsync();
     }
 
     private static string FormatBingChatMessage(Message message, uint chatRound, uint maxChatRound)
     {
         if (string.IsNullOrWhiteSpace(message.Text)) return $"> Bing未提供回答。";
-        
+
         var responseText = new StringBuilder(message.Text.TrimEnd('\n'));
-        responseText.AppendLine();    
-        
+        responseText.AppendLine();
+
         if (message.SuggestedResponses != null && message.SuggestedResponses.Length != 0)
         {
             responseText.AppendLine("-----");
@@ -274,10 +350,10 @@ internal class NewBingChatService : AiChatServiceBase
 
         responseText.AppendLine("-----");
         responseText.AppendLine($"对话轮次：({chatRound}/{maxChatRound})");
-        
+
         return responseText.ToString().TrimEnd('\n');
     }
-    
+
     private async Task<Exception?> InitConversation()
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "https://www.bing.com/turing/conversation/create");
@@ -318,7 +394,7 @@ internal class NewBingChatService : AiChatServiceBase
         (m_ConversationId, m_ClientId, m_ConversationSignature) = bingChatConversationCreateModel;
         return null;
     }
-    
+
     private string GenerateTraceId()
     {
         Random.Shared.NextBytes(m_TraceIdBuffer);

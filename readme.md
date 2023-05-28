@@ -2,16 +2,24 @@
 
 ## 摘要
 
-此项目使用[.Net 7](https://learn.microsoft.com/zh-cn/dotnet/core/whats-new/dotnet-7)来调用OpenAI的Api，通过[EleCho.GoCqHttpSdk](https://github.com/OrgEleCho/EleCho.GoCqHttpSdk)来和[go-cqhttp]客户端通信处理消息收发。
+此项目使用[.Net 7](https://learn.microsoft.com/zh-cn/dotnet/core/whats-new/dotnet-7)来调用 `OpenAI`的`ChatGpt对话Api`或使用[SignalR](https://learn.microsoft.com/zh-cn/aspnet/signalr/overview/getting-started/introduction-to-signalr)来访问`New Bing`的`对话/查询Api`，通过[EleCho.GoCqHttpSdk](https://github.com/OrgEleCho/EleCho.GoCqHttpSdk)来和[go-cqhttp]客户端通信处理消息收发。
 
 ## 介绍
 
-此项目为一个QQ机器人，用于在群组内提供便捷的GPT服务，此机器人的详细功能如下：
+此项目为一个QQ机器人，用于在群组内提供便捷的Ai对话应答服务，此机器人的详细功能如下：
+
+### 共通服务
 
 服务类型|明细
 :-|:-
-GPT服务|群员可以直接@此Bot并且提问，Bot会通过提供的OpenAi API Key访问Open AI的端口来生成回应
 流量管理|对于非白名单用户，Bot会根据应用程序配置的设置限制用户每秒可以使用GPT服务的次数
+模式切换|@此Bot并且输入`#chat:GPT` 或 `#chat:NewBing(仅当配置时)`在两个对话模型之间切换
+
+### OpenAI / ChatGpt 对话应答服务
+
+服务类型|明细
+:-|:-
+Ai对话应答服务|群员可以直接@此Bot并且提问，Bot会通过提供的 `OpenAi API Key` 访问 `Open AI的端口` 来生成回应
 上下文记忆|对于非白名单用户，Bot会提供最大50条会话上下文的上下文记忆服务
 用户命令： `#help` |@此Bot并且输入 `#help` 来获得Bot支持的所有功能解释
 用户命令： `#reset` |@此Bot并且输入 `#reset` 来重置对话的上下文信息
@@ -20,10 +28,21 @@ GPT服务|群员可以直接@此Bot并且提问，Bot会通过提供的OpenAi AP
 用户命令： `#custom-role` |@此Bot并且输入 `#custom-role:<自定义角色信息>` 来将用户提供的文本作为Bot回应该用户时的角色信息
 用户命令： `#history` |@此Bot并且输入 `#history` 来显示该用户当前的对话上下文记忆数量
 
+### 微软 / New Bing 对话应答/查询服务
+
+服务类型|明细
+:-|:-
+Ai对话应答/查询服务|群员可以直接@此Bot并且提问，Bot会通过 `New Bing` 的 `对话/查询Api` 来生成回应
+用户命令： `#help` |@此Bot并且输入 `#help` 来获得Bot支持的所有功能解释
+用户命令： `#reset` |@此Bot并且输入 `#reset` 来重置对话的上下文信息
+用户命令： `#style` |@此Bot并且输入 `#style` 来从三种必应的应答模式间切换：`平衡`, `创造`, `精准`
+
 当首次启动此项目时，会自动在项目应用程序目录产生应用**程序配置文件** `AppConfig.json`，以下是每个条目的介绍：
 
 条目|名称|介绍
 :-|:-|:-
+ `NewBingSupport` |启用New Bing|为Bot启用基于`New Bing`的对话应答/查询服务，需要配置`NewBingCookie`
+ `NewBingCookie` |New Bing Cookie|`New Bing`对话应答服务所依赖的`Cookie`
  `OpenAiApiKey` |OpenAI API 密钥|用于调用 OpenAI API 的密钥
  `BotWebSocketUri` |go-cqhttp 通信WebSocket地址|此应用程序通过WebSocket来和go-cqhttp通信，对于默认本机通信，使用 `ws://localhost:8080`
  `ApiHost` |OpenAI API 主机|当需要使用 `api.openai.com` 以外的主机来调用 OpenAI 的 API 时，设置此项

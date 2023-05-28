@@ -2,15 +2,15 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using MeowBot.Services;
+using MeowBot.Services.NewBing;
+using MeowBot.Services.OpenAi;
 
 namespace MeowBot;
 
 internal static partial class Program
 {
-    /// <summary>
-    /// 非白名单用户能够拥有的最大会话上下文数量
-    /// </summary>
-    private const int MaxHistoryCount = 50;
+    private delegate bool CheckAppConfigDelegate(AppConfig config, out string? failReason);
 
     /// <summary>
     /// 应用程序主循环
@@ -27,13 +27,54 @@ internal static partial class Program
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(appConfig.OpenAiApiKey))
+
+        #region 服务初始化
+
+#warning TODO: 可能需要想个方法解耦所有的服务
+
+        if (!OpenAiChatService.CheckConfig(appConfig, out var failReason))
         {
-            Console.WriteLine("请指定机器人 API Key");
+            Console.WriteLine(failReason);
             Utils.PressAnyKeyToContinue();
             return;
         }
 
+        DefaultChatServiceProvider.Register(config => new OpenAiChatService(config));
+
+        if (appConfig.NewBingSupport)
+        {
+            if (!NewBingChatService.CheckConfig(appConfig, out failReason))
+            {
+                Console.WriteLine(failReason);
+                Utils.PressAnyKeyToContinue();
+                return;
+            }
+
+            DefaultChatServiceProvider.Register(config => new NewBingChatService(config));
+        }
+
+        #endregion
+
+        #region QQBot初始化
+
+        var session = BuildSession(appConfig);
+
+        #endregion
+
+        // 配置异常处理
+        AppDomain.CurrentDomain.UnhandledException += (_, exception) =>
+        {
+            Console.WriteLine("出现了不可预知的异常");
+            if (exception.ExceptionObject is not Exception ex) return;
+            Console.WriteLine(ex);
+            Console.WriteLine();
+        };
+        // QQBot生命周期维持
+        await MainSession(session, appConfig);
+    }
+
+    private static CqWsSession BuildSession(AppConfig appConfig)
+    {
         // 初始化QQBot会话
         var session = new CqWsSession(new() { BaseUri = new(appConfig.BotWebSocketUri) });
 
@@ -48,7 +89,7 @@ internal static partial class Program
         session.UsePrivateMessage(async (context, next) =>
         {
             if (!appConfig.AccountWhiteList.Contains(context.UserId) &&
-                !appConfig.AccountPrivateMessageList.Contains(context.UserId)) 
+                !appConfig.AccountPrivateMessageList.Contains(context.UserId))
                 return;
             await next.Invoke();
         });
@@ -64,10 +105,7 @@ internal static partial class Program
             }
             catch (Exception ex)
             {
-                var tempColor = Console.ForegroundColor;
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                await Console.Out.WriteLineAsync(ex.ToString());
-                Console.ForegroundColor = tempColor;
+                await Utils.WriteLineColoredAsync($"Exception: {ex}", ConsoleColor.Magenta);
             }
         });
 
@@ -80,10 +118,7 @@ internal static partial class Program
             }
             catch (Exception ex)
             {
-                var tempColor = Console.ForegroundColor;
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                await Console.Out.WriteLineAsync(ex.ToString());
-                Console.ForegroundColor = tempColor;
+                await Utils.WriteLineColoredAsync($"Exception: {ex}", ConsoleColor.Magenta);
             }
         });
 
@@ -104,20 +139,7 @@ internal static partial class Program
             else
                 await session.RejectFriendRequestAsync(context.Flag);
         });
-
-        // 配置异常处理
-        AppDomain.CurrentDomain.UnhandledException += (_, exception) =>
-        {
-            Console.WriteLine("出现了不可预知的异常");
-            if (exception.ExceptionObject is Exception ex)
-            {
-                Console.WriteLine(ex);
-                Console.WriteLine();
-            }
-        };
-
-        // QQBot生命周期维持
-        await MainSession(session, appConfig);
+        return session;
     }
 
     /// <summary>
@@ -171,18 +193,29 @@ internal static partial class Program
             {
                 await session.StartAsync();
                 await Console.Out.WriteLineAsync("连接完成");
-                await Console.Out.WriteLineAsync($"模型: {appConfig.GptModel ?? AppConfig.DefaultGptModel}");
-                await Console.Out.WriteLineAsync($"API 主机: {appConfig.ApiHost ?? AppConfig.DefaultApiHost}");
-                await Console.Out.WriteLineAsync($"普通用户的使用频率限制在: {appConfig.UsageLimitTime}秒/{appConfig.UsageLimitCount}次");
-
+                await Console.Out.WriteLineAsync($"------------------");
+                await Console.Out.WriteLineAsync($"GPT信息：");
+                await Console.Out.WriteLineAsync($"\t模型: {appConfig.GptModel ?? AppConfig.DefaultGptModel}");
+                await Console.Out.WriteLineAsync($"\tAPI 主机: {appConfig.ApiHost ?? AppConfig.DefaultApiHost}");
+                await Console.Out.WriteLineAsync($"\t普通用户的使用频率限制在: {appConfig.UsageLimitTime}秒/{appConfig.UsageLimitCount}次");
+                await Console.Out.WriteLineAsync($"------------------");
+                await Console.Out.WriteLineAsync($"NewBing支持：{appConfig.NewBingSupport}");
+                await Console.Out.WriteLineAsync($"------------------");
                 await Console.Out.WriteLineAsync("用户白名单:");
                 await Console.Out.WriteLineAsync(string.Join("\n", appConfig.AccountWhiteList.Select(x => $"\t{x}")));
-
+                await Console.Out.WriteLineAsync($"------------------");
+                await Console.Out.WriteLineAsync("私聊白名单:");
+                await Console.Out.WriteLineAsync(string.Join("\n", appConfig.AccountPrivateMessageList.Select(x => $"\t{x}")));
+                await Console.Out.WriteLineAsync($"------------------");
                 await Console.Out.WriteLineAsync("用户黑名单:");
                 await Console.Out.WriteLineAsync(string.Join("\n", appConfig.AccountBlackList.Select(x => $"\t{x}")));
-
+                await Console.Out.WriteLineAsync($"------------------");
+                
                 await session.WaitForShutdownAsync();
-
+                session.Dispose();
+                session = BuildSession(appConfig);
+                
+                await Console.Out.WriteLineAsync($"------------------");
                 await Console.Out.WriteLineAsync("连接已结束... 5s 后重连");
                 await Task.Delay(oneSecondMillisecondsDelay);
                 await Console.Out.WriteLineAsync("连接已结束... 4s 后重连");

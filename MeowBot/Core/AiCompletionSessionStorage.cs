@@ -1,35 +1,25 @@
-﻿using MeowBot;
-using OpenAI;
-using OpenAI.Chat;
+﻿using MeowBot.Services;
 
 /// <summary>
-/// 用于存储用户的OpenAi对话信息的数据结构
+/// 用于存储用户的AI会话服务对话信息的数据结构
 /// </summary>
 internal class AiCompletionSessionStorage
 {
-    public AiCompletionSessionStorage(OpenAIClient client)
+    public AiCompletionSessionStorage(AiChatServiceBase service)
     {
-        Client = client;
-
-        ChatHistory = new();
+        Service = service;
         UsageHistoryTime = new();
     }
 
     /// <summary>
-    /// 用户的OpenAi对话客户端
+    /// 用户的Ai对话服务
     /// </summary>
-    public OpenAIClient Client { get; }
-
-    public Queue<Message> ChatHistory { get; }
+    public AiChatServiceBase Service { get; set; }
 
     /// <summary>
     /// 存储用户的上一次访问时间，以及访问频率
     /// </summary>
-    public Queue<DateTime> UsageHistoryTime { get; }
-
-    public double Temperature { get; set; }
-
-    public string SystemMessage { get; set; } = string.Empty;
+    private Queue<DateTime> UsageHistoryTime { get; }
 
     /// <summary>
     /// 记录用户在当前时间点使用了该API
@@ -52,10 +42,10 @@ internal class AiCompletionSessionStorage
     }
 
     /// <summary>
-    /// 获得用户在给定时间段（当前时间-<paramref name="duration"/>>到当前之间）之间访问OpenAiAPI的总计数
+    /// 获得用户在给定时间段（当前时间-<paramref name="duration"/>>到当前之间）之间访问AI应答API的总计数
     /// </summary>
     /// <param name="duration">时间段</param>
-    /// <returns>用户在给定时间段之间访问OpenAiAPI的总计数</returns>
+    /// <returns>用户在给定时间段之间访问AI应答API的总计数</returns>
     public int GetUsageCountInLastDuration(TimeSpan duration)
     {
         var end = DateTime.Now;

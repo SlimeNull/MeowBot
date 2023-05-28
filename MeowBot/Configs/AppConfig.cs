@@ -7,6 +7,18 @@ internal class AppConfig
 {
     public const string Filename = "AppConfig.json";
 
+#warning TODO: 可能需要想个方法解耦所有的服务
+
+    /// <summary>
+    /// 是否使用NewBing作为聊天服务
+    /// </summary>
+    public bool NewBingSupport { get; set; } = false;
+    
+    /// <summary>
+    /// 用于使用Bing服务的Cookie("U_"开头的Cookie)
+    /// </summary>
+    public string NewBingCookie { get; set; } = string.Empty;
+
     /// <summary>
     /// 用于和OpenAI通信的密钥
     /// </summary>

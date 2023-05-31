@@ -99,7 +99,7 @@ internal class NewBingChatService : AiChatServiceBase
         {
             m_HasBingStartTyping = true;
             m_HasBingSpoken = true;
-            m_SendMessageCallback("NewBing 正在输入...", false);
+            // m_SendMessageCallback("NewBing 正在输入...", false);
         }
     }
 

@@ -51,13 +51,7 @@ internal class NewBingChatService : AiChatServiceBase
         m_HubConnectionBuilder = new HubConnectionBuilder()
             .WithUrl("https://sydney.bing.com/sydney/ChatHub",
                 HttpTransportType.WebSockets,
-                options => { options.SkipNegotiation = true; })
-            .WithAutomaticReconnect(new[]
-            {
-                TimeSpan.FromSeconds(3),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromSeconds(10)
-            });
+                options => { options.SkipNegotiation = true; });
     }
 
     private void OnChatHubMessageUpdate(JsonDocument jsonDocument)
@@ -152,27 +146,17 @@ internal class NewBingChatService : AiChatServiceBase
         {
             if (exception != null)
             {
-                Console.WriteLine($"> 远端Bing服务器已关闭连接，正在执行重连！");
+                Console.WriteLine($"> 远端Bing服务器已关闭连接，下次会话时将进行重连！");
                 Console.WriteLine($"> {exception.Message}");
             }
             else
             {
-                Console.WriteLine($"> Bing服务器已连接已结束，正在执行重连！");
+                Console.WriteLine($"> Bing服务器已连接已结束，下次会话时将进行重连！");
             }
 
-            try
-            {
-                // ReSharper disable once MethodSupportsCancellation
-                await Task.Delay(1000);
-                var cancellationTokenSource = new CancellationTokenSource(CTX_TIMEOUT);
-                await Task.Run(() => InitializeConnection(cancellationTokenSource.Token), cancellationTokenSource.Token);
-            }
-            catch (Exception)
-            {
-                await m_HubConnection.DisposeAsync();
-                m_HubConnection = null;
-                throw;
-            }
+            var localHub = m_HubConnection;
+            m_HubConnection = null;
+            await localHub.DisposeAsync();
         };
 
     }
@@ -228,9 +212,9 @@ internal class NewBingChatService : AiChatServiceBase
             return m_PendingException;
         }
 
-        if (m_LastBingResponse?.Messages == null)
+        if (m_LastBingResponse?.Messages == null || m_LastBingResponse.Messages.Length == 0)
         {
-            await sendMessageCallback("> 此轮会话已被Bing结束，下一次将建立新的对话。", true);
+            await sendMessageCallback("> Bing未提供回复，下一次将建立新的对话。", true);
             m_IsStartOfSession = true;
             return null;
         }

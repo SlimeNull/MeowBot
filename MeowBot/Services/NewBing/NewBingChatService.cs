@@ -11,7 +11,6 @@ internal class NewBingChatService : AiChatServiceBase
     private readonly HttpClient m_HttpClient = new();
     private readonly string m_NewBingCookie;
     private readonly byte[] m_TraceIdBuffer = new byte[16];
-    private readonly IHubConnectionBuilder m_HubConnectionBuilder;
 
     private const int CTX_TIMEOUT = 10000;
 
@@ -48,10 +47,6 @@ internal class NewBingChatService : AiChatServiceBase
     public NewBingChatService(AppConfig config) : base(config)
     {
         m_NewBingCookie = config.NewBingCookie;
-        m_HubConnectionBuilder = new HubConnectionBuilder()
-            .WithUrl("https://sydney.bing.com/sydney/ChatHub",
-                HttpTransportType.WebSockets,
-                options => { options.SkipNegotiation = true; });
     }
 
     private void OnChatHubMessageUpdate(JsonDocument jsonDocument)
@@ -119,7 +114,11 @@ internal class NewBingChatService : AiChatServiceBase
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                m_HubConnection = m_HubConnectionBuilder.Build();
+                m_HubConnection = new HubConnectionBuilder()
+                    .WithUrl("https://sydney.bing.com/sydney/ChatHub",
+                        HttpTransportType.WebSockets,
+                        options => { options.SkipNegotiation = true; })
+                    .Build();
                 m_HubConnection.On<JsonDocument>("update", OnChatHubMessageUpdate);
                 await m_HubConnection.StartAsync(cancellationToken);
                 break;

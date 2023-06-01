@@ -53,6 +53,7 @@ internal class NewBingChatService : AiChatServiceBase
                 options => { options.SkipNegotiation = true; })
             .Build();
         m_HubConnection.On<JsonDocument>("update", OnChatHubMessageUpdate);
+        m_Disconnected = true;
     }
 
     private void OnChatHubMessageUpdate(JsonDocument jsonDocument)

@@ -26,18 +26,18 @@ internal static partial class Program
     /// <param name="aiSessionStorages">所有用户的AI会话服务会话上下文存储信息</param>
     /// <param name="appConfig">应用程序设置</param>
     /// <param name="session">QQBot的Socket会话</param>
-    private static Task OnGroupMessageReceived(CqGroupMessagePostContext context, IDictionary<long, AiCompletionSessionStorage> aiSessionStorages, AppConfig appConfig, CqWsSession session)
+    private static async Task OnGroupMessageReceived(CqGroupMessagePostContext context, IDictionary<long, AiCompletionSessionStorage> aiSessionStorages, AppConfig appConfig, CqWsSession session)
     {
         // 仅在自己被@的时候做出反应
         if (!context.Message.Any(msg => msg is CqAtMsg atMsg && atMsg.Target == context.SelfId))
         {
-            return Task.CompletedTask;
+            return;// Task.CompletedTask;
         }
 
         var cqGroupMessageSender = context.Sender;
 
-        QueueMessage(cqGroupMessageSender.UserId, () =>
-            OnMessageReceived
+        // QueueMessage(cqGroupMessageSender.UserId, () =>
+            await OnMessageReceived
             (
                 context.Message.Text,
                 aiSessionStorages,
@@ -48,21 +48,23 @@ internal static partial class Program
                 {
                     if (atUser)
                     {
-                        return session.SendGroupMessageAsync(context.GroupId, new()
-                        {
-                            new CqAtMsg(context.UserId),
-                            new CqTextMsg("\n" + messageText)
-                        });
+                        return session.SendGroupMessageAsync(context.GroupId,
+                            new()
+                            {
+                                new CqAtMsg(context.UserId),
+                                new CqTextMsg("\n" + messageText)
+                            });
                     }
 
-                    return session.SendGroupMessageAsync(context.GroupId, new()
-                    {
-                        new CqTextMsg(messageText)
-                    });
+                    return session.SendGroupMessageAsync(context.GroupId,
+                        new()
+                        {
+                            new CqTextMsg(messageText)
+                        });
                 }
-            )
-        );
-        return Task.CompletedTask;
+            );
+            // );
+            // return Task.CompletedTask;
     }
 
     /// <summary>
@@ -72,12 +74,12 @@ internal static partial class Program
     /// <param name="aiSessionStorages">所有用户的AI会话服务会话上下文存储信息</param>
     /// <param name="appConfig">应用程序设置</param>
     /// <param name="session">QQBot的Socket会话</param>
-    private static Task OnPrivateMessageReceived(CqPrivateMessagePostContext context, IDictionary<long, AiCompletionSessionStorage> aiSessionStorages, AppConfig appConfig, CqWsSession session)
+    private static async Task OnPrivateMessageReceived(CqPrivateMessagePostContext context, IDictionary<long, AiCompletionSessionStorage> aiSessionStorages, AppConfig appConfig, CqWsSession session)
     {
         var cqMessageSender = context.Sender;
 
-        QueueMessage(cqMessageSender.UserId, () =>
-            OnMessageReceived(context.Message.Text,
+        // QueueMessage(cqMessageSender.UserId, () =>
+            await OnMessageReceived(context.Message.Text,
                 aiSessionStorages,
                 appConfig,
                 cqMessageSender.UserId,
@@ -90,10 +92,10 @@ internal static partial class Program
                         new CqTextMsg(messageText)
                     }
                 )
-            )
-        );
+            );
+        // );
 
-        return Task.CompletedTask;
+        // return Task.CompletedTask;
     }
 }
 

@@ -10,6 +10,11 @@ internal class AppConfig
 #warning TODO: 可能需要想个方法解耦所有的服务
 
     /// <summary>
+    /// 使用NewBing作为初始聊天服务
+    /// </summary>
+    public bool DefaultToNewBing { get; set; } = false;
+
+    /// <summary>
     /// 是否使用NewBing作为聊天服务
     /// </summary>
     public bool NewBingSupport { get; set; } = false;

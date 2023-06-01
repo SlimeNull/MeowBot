@@ -50,7 +50,10 @@ internal static partial class Program
                 return;
             }
 
-            DefaultChatServiceProvider.Register(config => new NewBingChatService(config));
+            if (appConfig.DefaultToNewBing)
+            {
+                DefaultChatServiceProvider.Register(config => new NewBingChatService(config));
+            }
         }
 
         #endregion
